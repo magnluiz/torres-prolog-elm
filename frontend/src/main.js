@@ -13,7 +13,7 @@ import { Elm } from "./Main.elm";
 
 // Tema inicial: a última escolha do jogador (guardada no localStorage do
 // navegador) ou, na primeira visita, a preferência do sistema operacional.
-const THEME_KEY = "sudoku-theme";
+const THEME_KEY = "torres-theme";
 const savedTheme = localStorage.getItem(THEME_KEY);
 const systemIsDark = window.matchMedia("(prefers-color-scheme: dark)").matches;
 const darkTheme = savedTheme ? savedTheme === "dark" : systemIsDark;

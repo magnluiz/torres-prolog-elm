@@ -1,5 +1,5 @@
 /* ==========================================================================
-   style.css: todo o visual do Sudoku.
+   style.css: todo o visual das Torres Latinas.
 
    COMO ESTE ARQUIVO ESTÁ ORGANIZADO
    ---------------------------------
@@ -224,7 +224,7 @@
 
 :root {
   /* --- Tipografia --- */
-  --font-title: var(--font-display);  /* título "Sudoku" */
+  --font-title: var(--font-display);  /* título "Torres Latinas" */
   /* Todos os números usam UMA fonte geométrica. A origem de cada número
      (pista, jogador, Prolog) é indicada só por peso, cor e fundo. Fontes
      variáveis aceitam qualquer peso de 100 a 900, não só 400 e 700. */
@@ -498,13 +498,15 @@
      tamanho dos números acompanha o tabuleiro, qualquer que seja a tela
      (veja `.cell`, abaixo).
 
-     `grid-rows-9` é tão necessário quanto `grid-cols-9`: sem ele, a altura
-     de cada linha depende do conteúdo, e uma linha vazia fica mais baixa que
-     uma linha com números. Com os dois, as 81 casas têm o mesmo tamanho. */
+     O Elm informa o tamanho da grade na variável `--n` (4, 5 ou 6), e
+     `repeat(var(--n), 1fr)` cria N colunas e N linhas do mesmo tamanho. */
 
   .board {
-    @apply relative grid grid-cols-9 grid-rows-9 overflow-hidden;
-    width: var(--board-size);
+    @apply relative grid overflow-hidden;
+    grid-area: board;
+    grid-template-columns: repeat(var(--n), 1fr);
+    grid-template-rows: repeat(var(--n), 1fr);
+    width: calc(var(--cell) * var(--n));
     aspect-ratio: 1;
     container-type: inline-size;
     border: var(--board-line-thick) solid var(--board-box-color);
@@ -538,13 +540,61 @@
     animation: spin-angle calc(3s * var(--speed)) linear infinite;
   }
 
+  /* ---------- Pistas de borda ----------
+     `.towers` é uma grade 3 x 3 de ÁREAS com nome: as pistas em volta, o
+     tabuleiro no meio e os quatro cantos vazios. `--cell` é o tamanho de
+     uma casa: o espaço total dividido por N casas + 2 faixas de pistas. */
+
+  .towers {
+    --cell: calc(var(--board-size) / (var(--n, 5) + 2));
+    display: grid;
+    grid-template-columns: var(--cell) auto var(--cell);
+    grid-template-areas:
+      ".    top    .    "
+      "left board  right"
+      ".    bottom .    ";
+    width: var(--board-size);
+    justify-content: center;
+  }
+  .towers--waiting {
+    aspect-ratio: 1;
+  }
+  .towers-corner { display: none; }
+
+  .clues {
+    display: grid;
+    font-family: var(--font-numbers);
+    font-size: calc(var(--cell) * 0.42);
+    font-weight: 600;
+  }
+  .clues--top,
+  .clues--bottom {
+    grid-template-columns: repeat(var(--n), 1fr);
+    height: var(--cell);
+  }
+  .clues--left,
+  .clues--right {
+    grid-template-rows: repeat(var(--n), 1fr);
+  }
+  .clues--top    { grid-area: top; }
+  .clues--bottom { grid-area: bottom; }
+  .clues--left   { grid-area: left; }
+  .clues--right  { grid-area: right; }
+
+  .clue {
+    @apply flex items-center justify-center;
+    opacity: 0.8;
+    transition: color calc(150ms * var(--speed));
+  }
+  .clue--ok    { color: var(--color-success); opacity: 1; }
+  .clue--wrong { color: var(--color-error); opacity: 1; }
+
   /* ---------- Casas ---------- */
 
   .cell {
     @apply relative flex items-center justify-center select-none;
-    /* 100cqi = largura do tabuleiro; / 9 = largura de uma casa. */
     font-family: var(--font-numbers);
-    font-size: calc(100cqi / 9 * 0.52);
+    font-size: calc(var(--cell) * 0.52);
     font-variant-numeric: tabular-nums;
     line-height: 1;
     /* Duas camadas de fundo: a cor de estado (seleção, destaques) e, por
@@ -558,21 +608,6 @@
     transition: background-color calc(120ms * var(--speed)), color calc(120ms * var(--speed));
     cursor: pointer;
 
-    /* Linhas grossas dos blocos 3x3, calculadas só com CSS.
-       As 81 casas são filhas do tabuleiro, em ordem de leitura.
-       `:nth-child(9n + 3)` = 3ª, 12ª, 21ª... casa = coluna 3 de cada linha. */
-    &:nth-child(9n + 3),
-    &:nth-child(9n + 6) {
-      border-right: var(--board-line-thick) solid var(--board-box-color);
-    }
-    /* `:nth-child(n + 19):nth-child(-n + 27)` = da 19ª à 27ª casa = linha 3. */
-    &:nth-child(n + 19):nth-child(-n + 27),
-    &:nth-child(n + 46):nth-child(-n + 54) {
-      border-bottom: var(--board-line-thick) solid var(--board-box-color);
-    }
-    /* Última coluna e última linha não precisam de borda (o tabuleiro já tem). */
-    &:nth-child(9n)       { border-right: none; }
-    &:nth-child(n + 73)   { border-bottom: none; }
 
     &:hover {
       background-color: var(--cell-hover);
@@ -662,6 +697,32 @@
     animation: reveal calc(500ms * var(--speed)) ease-out;
   }
 
+  /* ---------- Pontos entre casas vizinhas ----------
+     Cada casa desenha os pontos da sua borda direita e de baixo. O ponto é
+     posicionado em cima da linha (metade dele em cada casa); `z-index`
+     o põe por cima da casa vizinha, que vem depois no HTML. */
+
+  .dot {
+    position: absolute;
+    z-index: 2;
+    width: calc(var(--cell) * 0.2);
+    aspect-ratio: 1;
+    border-radius: 999px;
+    background: var(--color-base-content);
+    box-shadow: 0 0 0 2px var(--color-base-100);
+    pointer-events: none;
+  }
+  .dot--right {
+    top: 50%;
+    right: 0;
+    translate: 50% -50%;
+  }
+  .dot--down {
+    bottom: 0;
+    left: 50%;
+    translate: -50% 50%;
+  }
+
   /* ---------- Marcações de canto ----------
      A casa ganha uma grade 3x3 invisível. O Elm só coloca as marcações em
      ordem crescente, e é o CSS que decide onde cada uma fica: 1ª marcação no
@@ -676,7 +737,7 @@
   .corner-marks {
     @apply absolute grid grid-cols-3 grid-rows-3;
     inset: 7%;
-    font-size: calc(100cqi / 9 * 0.24);
+    font-size: calc(var(--cell) * 0.24);
     font-weight: var(--marks-weight);
   }
 
@@ -753,6 +814,15 @@
   .action-button--hint    { @apply btn-secondary; }
   .action-button--solve   { @apply btn-accent; }
   .action-button--reset   { @apply btn-ghost; }
+
+  /* ---------- Como jogar ---------- */
+
+  .rules {
+    @apply text-sm;
+    summary { @apply cursor-pointer font-semibold; }
+    ul      { @apply mt-2 list-disc space-y-1 pl-5; }
+    p       { @apply mt-2 opacity-70; }
+  }
 }
 
 

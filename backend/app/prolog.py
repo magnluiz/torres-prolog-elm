@@ -8,7 +8,6 @@ Conversão automática de tipos (Python -> Prolog):
     int          -> inteiro
     str          -> string  (use janus.Term / átomos com cuidado, veja abaixo)
     list         -> lista
-    dict         -> dict do SWI-Prolog
 
 Para mais detalhes: https://www.swi-prolog.org/pldoc/man?section=janus
 
@@ -22,9 +21,13 @@ import janus_swi as janus
 
 Grid = list[list[int]]
 
-PROLOG_FILE = Path(__file__).parent.parent / "prolog" / "sudoku.pl"
+# Um puzzle, como torres.pl o representa: [Top, Bottom, Left, Right, HDots, VDots].
+# As quatro primeiras são listas de pistas; as duas últimas, grades de 0/1.
+PrologPuzzle = list
 
-# consult/1 carrega o arquivo .pl, como `?- [sudoku].` no terminal do swipl.
+PROLOG_FILE = Path(__file__).parent.parent / "prolog" / "torres.pl"
+
+# consult/1 carrega o arquivo .pl, como `?- [torres].` no terminal do swipl.
 janus.consult(str(PROLOG_FILE))
 
 
@@ -36,33 +39,32 @@ class BoardComplete(Exception):
     """O tabuleiro não tem casas vazias: não há dica para dar."""
 
 
-def solve(puzzle: Grid) -> Grid:
+def solve(puzzle: PrologPuzzle, board: Grid) -> Grid:
     # query_once executa a consulta e devolve um dict com as variáveis da
-    # consulta (em maiúsculas, como no Prolog) e a chave 'truth', que diz se
-    # a consulta teve sucesso.
-    result = janus.query_once("sudoku:solve(Puzzle, Solution)", {"Puzzle": puzzle})
+    # consulta e a chave 'truth', que diz se a consulta teve sucesso.
+    result = janus.query_once(
+        "torres:solve(Puzzle, Board, Solution)", {"Puzzle": puzzle, "Board": board}
+    )
     if not result["truth"]:
         raise NoSolution
     return result["Solution"]
 
 
-def generate(difficulty: str) -> Grid:
-    # Strings do Python viram strings do Prolog, mas generate/2 espera um
-    # ÁTOMO (easy, medium, hard). atom_string/2 faz a conversão do lado Prolog.
+def generate(difficulty: str) -> PrologPuzzle:
+    # generate/2 espera um ÁTOMO (easy, medium, hard); atom_string/2 converte
+    # a string que veio do Python.
     result = janus.query_once(
-        "atom_string(D, Name), sudoku:generate(D, Puzzle)", {"Name": difficulty}
+        "atom_string(D, Name), torres:generate(D, Puzzle)", {"Name": difficulty}
     )
     return result["Puzzle"]
 
 
-def hint(board: Grid) -> tuple[int, int, int]:
-    result = janus.query_once("sudoku:hint(Board, Result)", {"Board": board})["Result"]
-    # hint/2 sempre tem sucesso e devolve, em Result, uma lista [Linha,
-    # Coluna, Valor] ou um dos átomos `complete` e `unsolvable` (átomos
-    # chegam ao Python como strings). Quem decidiu o que aconteceu foi o
-    # Prolog; aqui só traduzimos cada caso. O `match` do Python escolhe o
-    # ramo pela FORMA do valor, parecido com o casamento de padrões do
-    # Prolog e do Elm.
+def hint(puzzle: PrologPuzzle, board: Grid) -> tuple[int, int, int]:
+    result = janus.query_once(
+        "torres:hint(Puzzle, Board, Result)", {"Puzzle": puzzle, "Board": board}
+    )["Result"]
+    # hint/3 sempre tem sucesso: Result é [Linha, Coluna, Altura] ou um dos
+    # átomos `complete` e `unsolvable` (que chegam como strings).
     match result:
         case "complete":
             raise BoardComplete
@@ -70,4 +72,4 @@ def hint(board: Grid) -> tuple[int, int, int]:
             raise NoSolution
         case [row, col, value]:
             return row, col, value
-    raise ValueError(f"resultado inesperado de hint/2: {result!r}")
+    raise ValueError(f"resultado inesperado de hint/3: {result!r}")

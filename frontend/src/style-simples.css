@@ -1,5 +1,5 @@
 /* ==========================================================================
-   style-simples.css: versão minimalista do visual do Sudoku.
+   style-simples.css: versão minimalista do visual das Torres Latinas.
 
    Este arquivo é um ponto de partida mais fácil que o style.css. Ele define
    as MESMAS classes (o Elm não muda), mas quase só com `@apply`, sem
@@ -146,12 +146,40 @@
   .spinner          { @apply loading loading-spinner loading-sm; }
 
 
-  /* ---------- Tabuleiro ----------
-     O tabuleiro é um grid de 9 colunas. Cada casa tem tamanho fixo:
-     w-9/h-9 (2.25rem) no celular e w-12/h-12 (3rem) em telas maiores. */
+  /* ---------- Pistas e tabuleiro ----------
+     `.towers` é uma grade 3 x 3: pistas em volta, tabuleiro no meio. O Elm
+     informa o tamanho N na variável `--n`, e `repeat(var(--n), ...)` cria
+     N colunas. Cada casa tem tamanho fixo: w-9/h-9 (2.25rem) no celular e
+     w-12/h-12 (3rem) em telas maiores. */
+
+  .towers {
+    @apply mx-auto grid w-fit;
+    grid-template-columns: auto auto auto;
+    grid-template-areas:
+      ".    top    .    "
+      "left board  right"
+      ".    bottom .    ";
+  }
+  .towers-corner { @apply hidden; }
+
+  .clues        { @apply grid font-bold; }
+  .clues--top,
+  .clues--bottom { grid-template-columns: repeat(var(--n), auto); }
+  .clues--left,
+  .clues--right  { grid-template-rows: repeat(var(--n), auto); }
+  .clues--top    { grid-area: top; }
+  .clues--bottom { grid-area: bottom; }
+  .clues--left   { grid-area: left; }
+  .clues--right  { grid-area: right; }
+
+  .clue        { @apply flex h-9 min-w-9 items-center justify-center sm:h-12 sm:min-w-12; }
+  .clue--ok    { @apply text-success; }
+  .clue--wrong { @apply text-error; }
 
   .board {
-    @apply mx-auto grid w-fit grid-cols-9 border-2 border-base-content bg-base-100;
+    @apply grid border-2 border-base-content bg-base-100;
+    grid-area: board;
+    grid-template-columns: repeat(var(--n), auto);
   }
 
   .cell {
@@ -159,28 +187,10 @@
     @apply relative cursor-pointer select-none;
   }
 
-  /* Linhas grossas entre os blocos 3x3.
-     As casas são desenhadas em ordem de leitura (81 filhas do tabuleiro), e
-     `:nth-child` escolhe casas pela posição:
-       :nth-child(9n + 3)   -> casas 3, 12, 21, ... (3ª coluna)
-       :nth-child(9n + 6)   -> casas 6, 15, 24, ... (6ª coluna)
-     Para as linhas horizontais, escolhemos as casas 19 a 27 (3ª linha) e
-     46 a 54 (6ª linha). */
-  .cell:nth-child(9n + 3),
-  .cell:nth-child(9n + 6) {
-    @apply border-r-2 border-r-base-content;
-  }
-
-  .cell:nth-child(n + 19):nth-child(-n + 27),
-  .cell:nth-child(n + 46):nth-child(-n + 54) {
-    @apply border-b-2 border-b-base-content;
-  }
-
-  /* A última coluna (casas 9, 18, 27...) e a última linha (casas 73 a 81)
-     encostam na borda do tabuleiro, que já é grossa: sem esta regra, a
-     borda ficaria dupla. */
-  .cell:nth-child(9n)     { @apply border-r-0; }
-  .cell:nth-child(n + 73) { @apply border-b-0; }
+  /* Pontos: um círculo pequeno na borda direita ou de baixo da casa. */
+  .dot           { @apply pointer-events-none absolute z-10 h-2 w-2 rounded-full bg-base-content; }
+  .dot--right    { @apply top-1/2 right-0 translate-x-1/2 -translate-y-1/2; }
+  .dot--down     { @apply bottom-0 left-1/2 -translate-x-1/2 translate-y-1/2; }
 
   .cell:hover { @apply bg-base-200; }
 
@@ -264,4 +274,11 @@
   .action-button--hint  { @apply btn-secondary; }
   .action-button--solve { @apply btn-accent; }
   .action-button--reset { @apply btn-ghost; }
+}
+
+@layer components {
+  .rules         { @apply text-sm; }
+  .rules summary { @apply cursor-pointer font-semibold; }
+  .rules ul      { @apply mt-2 list-disc space-y-1 pl-5; }
+  .rules p       { @apply mt-2 opacity-70; }
 }

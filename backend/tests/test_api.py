@@ -1,12 +1,11 @@
 """Testes da API HTTP (pytest).
 
 Usamos o TestClient do FastAPI: ele chama a aplicação diretamente, sem subir
-um servidor nem abrir porta. Cada função `test_*` é um teste; o pytest as
-encontra sozinho.
+um servidor nem abrir porta.
 
 Rodar: `uv run pytest` (na pasta backend) ou `make test-backend` (na raiz).
 
-As regras do Sudoku são testadas em Prolog (prolog/test_sudoku.pl). Aqui
+As regras do jogo são testadas em Prolog (prolog/test_torres.pl). Aqui
 conferimos só a "cola": rotas, formato do JSON e códigos de status.
 """
 
@@ -16,68 +15,59 @@ from app.main import app
 
 client = TestClient(app)
 
-# O mesmo puzzle de example_puzzle/1 em sudoku.pl.
-EXAMPLE = [
-    [5, 3, 0, 0, 7, 0, 0, 0, 0],
-    [6, 0, 0, 1, 9, 5, 0, 0, 0],
-    [0, 9, 8, 0, 0, 0, 0, 6, 0],
-    [8, 0, 0, 0, 6, 0, 0, 0, 3],
-    [4, 0, 0, 8, 0, 3, 0, 0, 1],
-    [7, 0, 0, 0, 2, 0, 0, 0, 6],
-    [0, 6, 0, 0, 0, 0, 2, 8, 0],
-    [0, 0, 0, 4, 1, 9, 0, 0, 5],
-    [0, 0, 0, 0, 8, 0, 0, 7, 9],
-]
-
-
-def solved_example() -> list[list[int]]:
-    """A solução do puzzle de exemplo, obtida pela própria API."""
-    return client.post("/api/solve", json={"board": EXAMPLE}).json()["board"]
+# O mesmo puzzle de example_puzzle/1 em torres.pl.
+EXAMPLE = {
+    "top": [4, 3, 2, 1],
+    "bottom": [1, 2, 2, 2],
+    "left": [4, 3, 2, 1],
+    "right": [1, 2, 2, 2],
+    "hdots": [[1, 1, 1], [1, 1, 0], [1, 0, 1], [0, 1, 1]],
+    "vdots": [[1, 1, 1, 0], [1, 1, 0, 1], [1, 0, 1, 1]],
+}
+SOLUTION = [[1, 2, 3, 4], [2, 3, 4, 1], [3, 4, 1, 2], [4, 1, 2, 3]]
+EMPTY = [[0] * 4 for _ in range(4)]
 
 
 def test_solve():
-    response = client.post("/api/solve", json={"board": EXAMPLE})
+    response = client.post("/api/solve", json={"puzzle": EXAMPLE, "board": EMPTY})
     assert response.status_code == 200
-    assert response.json()["board"][0] == [5, 3, 4, 6, 7, 8, 9, 1, 2]
+    assert response.json()["board"] == SOLUTION
 
 
-def test_solve_without_solution():
-    board = [row[:] for row in EXAMPLE]  # cópia, para não alterar EXAMPLE
-    board[0][2] = 5  # dois 5 na primeira linha
-    response = client.post("/api/solve", json={"board": board})
+def test_solve_with_wrong_height():
+    board = [row[:] for row in EMPTY]
+    board[0][0] = 4  # a solução tem 1 aqui
+    response = client.post("/api/solve", json={"puzzle": EXAMPLE, "board": board})
     assert response.status_code == 422
 
 
-def test_solve_rejects_malformed_board():
-    # Quem rejeita aqui é o Pydantic, antes de o Prolog ser chamado.
-    response = client.post("/api/solve", json={"board": [[1, 2, 3]]})
+def test_rejects_board_of_wrong_size():
+    response = client.post("/api/solve", json={"puzzle": EXAMPLE, "board": [[0] * 5] * 5})
+    assert response.status_code == 422
+
+
+def test_rejects_malformed_puzzle():
+    puzzle = {**EXAMPLE, "hdots": [[1, 1]]}
+    response = client.post("/api/solve", json={"puzzle": puzzle, "board": EMPTY})
     assert response.status_code == 422
 
 
 def test_generate():
     response = client.post("/api/generate", json={"difficulty": "easy"})
     assert response.status_code == 200
-    board = response.json()["board"]
-    assert len(board) == 9 and all(len(row) == 9 for row in board)
-    assert 0 in sum(board, [])  # sum(..., []) concatena as linhas: há casa vazia
+    puzzle = response.json()["puzzle"]
+    assert len(puzzle["top"]) == 4
+    assert len(puzzle["hdots"]) == 4 and len(puzzle["vdots"]) == 3
 
 
 def test_hint():
-    response = client.post("/api/hint", json={"board": EXAMPLE})
+    response = client.post("/api/hint", json={"puzzle": EXAMPLE, "board": EMPTY})
     assert response.status_code == 200
     hint = response.json()
-    assert EXAMPLE[hint["row"]][hint["col"]] == 0  # a dica é para uma casa vazia
+    assert SOLUTION[hint["row"]][hint["col"]] == hint["value"]
 
 
 def test_hint_on_complete_board():
-    response = client.post("/api/hint", json={"board": solved_example()})
+    response = client.post("/api/hint", json={"puzzle": EXAMPLE, "board": SOLUTION})
     assert response.status_code == 422
     assert response.json()["detail"] == "O tabuleiro já está completo."
-
-
-def test_hint_on_full_board_with_errors():
-    board = solved_example()
-    board[0][0], board[0][1] = board[0][1], board[0][0]  # troca dois números
-    response = client.post("/api/hint", json={"board": board})
-    assert response.status_code == 422
-    assert "não tem solução" in response.json()["detail"]
