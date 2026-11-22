@@ -154,31 +154,61 @@ alternative_eliminated(Neighbor, Value, N, Board, Row, Col) :-
     !.
 
 %!  edge_clue_forced(+Puzzle, +Row, +Col, +Value, +N, -Explanation) is semidet.
-%   Verifica se uma pista de visibilidade obriga a célula a receber o prédio mais alto de todos.
+%   Verifica se uma pista de borda (1 ou N) obriga a altura da célula.
 edge_clue_forced(Puzzle, Row, Col, Value, N, Explanation) :-
     Puzzle = [Top, Bottom, Left, Right, _, _],
-    Value =:= N,
 
-    (   Row =:= 0, 
-        nth0(Col, Top, 1)
+    (   % Caso 1: Pista 1 obriga o prédio mais alto (N) colado na borda
+        Value =:= N,
+    
+        (   Row =:= 0, 
+            nth0(Col, Top, 1)
+    
+        ->  build_explanation(edge_clue_min, [Value], Explanation)
+    
+        ;   Row =:= N - 1,
+            nth0(Col, Bottom, 1)
+    
+        ->  build_explanation(edge_clue_min, [Value], Explanation)
+    
+        ;   Col =:= 0,
+            nth0(Row, Left, 1)
+    
+        ->  build_explanation(edge_clue_min, [Value], Explanation)
+    
+        ;   Col =:= N - 1,
+            nth0(Row, Right, 1)
+    
+        ->  build_explanation(edge_clue_min, [Value], Explanation)
+        )
 
-    ->  build_explanation(edge_clue_top, [Value], Explanation)
+    -> true
+    
+    ;
 
-    ;   Row =:= N - 1,
-        nth0(Col, Bottom, 1)
+        % Caso 2: Pista N obriga ordem estritamente crescente a partir da borda
+        (   nth0(Col, Top, N),
+            Value =:= Row + 1
 
-    ->  build_explanation(edge_clue_bottom, [Value], Explanation)
+        ->  build_explanation(edge_clue_max, [N, Value], Explanation)
 
-    ;   Col =:= 0,
-        nth0(Row, Left, 1)
+        ;   nth0(Col, Bottom, N),
+            Value =:= N - Row
 
-    ->  build_explanation(edge_clue_left, [Value], Explanation)
+        ->  build_explanation(edge_clue_max, [N, Value], Explanation)
 
-    ;   Col =:= N - 1,
-        nth0(Row, Right, 1)
+        ;   nth0(Row, Left, N),
+            Value =:= Col + 1
 
-    ->  build_explanation(edge_clue_right, [Value], Explanation)
+        ->  build_explanation(edge_clue_max, [N, Value], Explanation)
+
+        ;   nth0(Row, Right, N),
+            Value =:= N - Col
+
+        ->  build_explanation(edge_clue_max, [N, Value], Explanation)
+        )
     ).
+
 
 %! build_explanation(+Chave, +Argumentos, -TextoExplicacao) is det.
 build_explanation(Chave, Argumentos, TextoExplicacao) :-
@@ -204,23 +234,13 @@ message(
 ).
 
 message(
-    edge_clue_top,
+    edge_clue_min,
     'A pista de borda exige ver apenas 1 prédio. Portanto, o prédio mais alto (~w) tem que ficar nesta extremidade.'
 ).
 
 message(
-    edge_clue_bottom,
-    'A pista de borda exige ver apenas 1 prédio. Portanto, o prédio mais alto (~w) tem que ficar nesta extremidade.'
-).
-
-message(
-    edge_clue_left,
-    'A pista de borda exige ver apenas 1 prédio. Portanto, o prédio mais alto (~w) tem que ficar nesta extremidade.'
-).
-
-message(
-    edge_clue_right,
-    'A pista de borda exige ver apenas 1 prédio. Portanto, o prédio mais alto (~w) tem que ficar nesta extremidade.'
+    edge_clue_max,
+    'A pista de borda exige ver todos os ~w prédios. Portanto, as alturas devem crescer em ordem a partir da borda: esta posição deve ser ~w.'
 ).
 
 message(
