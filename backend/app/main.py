@@ -90,6 +90,7 @@ class HintResponse(BaseModel):
     row: int
     col: int
     value: int
+    explanation: str
 
 
 # Mensagens que o Elm mostra na tela quando a resposta é 422.
@@ -113,9 +114,9 @@ def solve(request: BoardRequest) -> BoardResponse:
 @app.post("/api/hint")
 def hint(request: BoardRequest) -> HintResponse:
     try:
-        row, col, value = prolog.hint(request.puzzle.to_prolog(), request.board)
+        row, col, value, explanation = prolog.hint(request.puzzle.to_prolog(), request.board)
     except prolog.NoSolution:
         raise HTTPException(status_code=422, detail=NO_SOLUTION) from None
     except prolog.BoardComplete:
         raise HTTPException(status_code=422, detail=BOARD_COMPLETE) from None
-    return HintResponse(row=row, col=col, value=value)
+    return HintResponse(row=row, col=col, value=value, explanation=explanation)

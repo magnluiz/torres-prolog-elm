@@ -77,6 +77,7 @@ estados possíveis.
 type Status
     = Idle
     | Thinking
+    | HintGiven String
     | Failed String
 
 
@@ -189,7 +190,7 @@ update msg model =
         HintRequested ->
             askProlog Api.hint GotHint model
 
-        GotHint (Ok { row, col, value }) ->
+        GotHint (Ok { row, col, value, explanation }) ->
             ( updateGame
                 (\game ->
                     { game
@@ -197,7 +198,7 @@ update msg model =
                         , selected = Just ( row, col )
                     }
                 )
-                { model | status = Idle }
+                { model | status = HintGiven explanation }
             , Cmd.none
             )
 
@@ -456,6 +457,12 @@ viewMessages model =
             div [ class "message message--loading" ]
                 [ span [ class "spinner" ] []
                 , span [] [ text "O Prolog está pensando..." ]
+                ]
+
+        HintGiven explanation -> 
+            div [ class "message message--info" ]
+                [ span [] [ text ("Dica: " ++ explanation) ]
+                , button [ class "message-close", onClick ErrorDismissed ] [ text "x" ]
                 ]
 
         Idle ->

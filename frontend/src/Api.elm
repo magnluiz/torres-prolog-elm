@@ -62,6 +62,7 @@ type alias Hint =
     { row : Int
     , col : Int
     , value : Int
+    , explanation : String
     }
 
 
@@ -138,10 +139,11 @@ gridDecoder =
 
 hintDecoder : Decoder Hint
 hintDecoder =
-    Decode.map3 Hint
+    Decode.map4 Hint
         (Decode.field "row" Decode.int)
         (Decode.field "col" Decode.int)
         (Decode.field "value" Decode.int)
+        (Decode.field "explanation" Decode.string)
 
 
 {-| `{"puzzle": {...}, "board": [[...], ...]}`: o backend não guarda

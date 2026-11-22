@@ -70,6 +70,6 @@ def hint(puzzle: PrologPuzzle, board: Grid) -> tuple[int, int, int]:
             raise BoardComplete
         case "unsolvable":
             raise NoSolution
-        case [row, col, value]:
-            return row, col, value
+        case [row, col, value, explanation]:
+            return row, col, value, explanation
     raise ValueError(f"resultado inesperado de hint/3: {result!r}")

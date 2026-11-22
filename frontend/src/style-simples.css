@@ -140,6 +140,7 @@
 
   .message          { @apply alert w-full text-sm; }
   .message--error   { @apply alert-error; }
+  .message--info    { @apply alert-info; }
   .message--success { @apply alert-success; }
   .message--loading { @apply alert-soft; }
   .message-close    { @apply btn btn-ghost btn-xs; }

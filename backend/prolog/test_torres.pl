@@ -108,14 +108,14 @@ test(bad_difficulty, error(type_error(_, impossible))) :-
 test(hint_matches_solution, true(Value == Expected)) :-
     example_puzzle(P),
     empty_board(4, B),
-    hint(P, B, [Row, Col, Value]),
+    hint(P, B, [Row, Col, Value, _Explanation]),
     solve(P, S),
     nth0(Row, S, SRow), nth0(Col, SRow, Expected).
 
 test(hint_on_empty_cell, true(Cell == 0)) :-
     example_puzzle(P),
     B = [[1,2,3,4],[0,0,0,0],[3,4,1,2],[4,1,2,3]],
-    hint(P, B, [Row, Col, _]),
+    hint(P, B, [Row, Col, _, _Explanation]),
     nth0(Row, B, BRow), nth0(Col, BRow, Cell).
 
 test(complete_board, true(Result == complete)) :-

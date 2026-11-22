@@ -64,6 +64,7 @@
 :- use_module(library(apply)).
 :- use_module(library(random)).
 :- use_module(library(solution_sequences)).
+:- use_module(explicador).
 
 
 /* =========================================================================
@@ -352,7 +353,8 @@ hint(Puzzle, Board, Result) :-
         ;   random_member(Row-Col, Empty),
             nth0(Row, Solution, SolutionRow),
             nth0(Col, SolutionRow, Value),
-            Result = [Row, Col, Value]
+            explain_cell(Puzzle, Board, Row, Col, Value, Explanation),
+            Result = [Row, Col, Value, Explanation]
         )
     ;   Result = unsolvable
     ).

@@ -65,6 +65,7 @@ def test_hint():
     assert response.status_code == 200
     hint = response.json()
     assert SOLUTION[hint["row"]][hint["col"]] == hint["value"]
+    assert "explanation" in hint and isinstance(hint["explanation"], str)
 
 
 def test_hint_on_complete_board():
