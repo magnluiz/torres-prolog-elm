@@ -218,10 +218,11 @@ negative_kropki_forced(Puzzle, Board, Row, Col, Value, Explanation) :-
     % 1. Localiza um vizinho preenchido com ponto Kropki
     dot_neighbor(Puzzle, Board, Row, Col, DotR, DotC, DotVal),
 
-    % 2. Descobre qual seria a outra opção viável de diferença 1
+    % 2. Verifica que Value é de fato consecutivo a DotVal e descobre a outra opção
     (   Value =:= DotVal + 1
     ->  AltOption is DotVal - 1
-    ;   AltOption is DotVal + 1
+    ;   Value =:= DotVal - 1, % guard: só prossegue se realmente consecutivo
+        AltOption is DotVal + 1
     ),
     between(1, N, AltOption),
 
@@ -357,10 +358,11 @@ kropki_dot_forced(Puzzle, Board, Row, Col, Value, Explanation) :-
 %   se a outra opção com diferença 1 é impossível ou já foi eliminada.
 alternative_eliminated(Neighbor, Value, N, Board, Row, Col) :-
         % 1. Descobre qual seria a outra opção com diferença de 1:
+        % Guard: Value deve ser de fato consecutivo ao Neighbor
     (   Value =:= Neighbor + 1
-
     ->  OtherOption is Neighbor - 1
-    ;   OtherOption is Neighbor + 1
+    ;   Value =:= Neighbor - 1,      % guard explícito: rejeita se não consecutivo
+        OtherOption is Neighbor + 1
     ),
 
         % 2. A outra opção tem que estar comprovadamente eliminada:

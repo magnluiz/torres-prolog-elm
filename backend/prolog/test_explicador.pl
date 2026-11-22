@@ -407,6 +407,26 @@ set_test_clue(Side, Index, Value, Puzzle) :-
     blank_puzzle(5, Puzzle0),
     set_test_clue(Side, Index, Value, Puzzle0, Puzzle).
 
+% ── Testes de rejeição do bug identificado (guard de consecutividade) ──────────
+
+% negative_kropki_forced não deve aceitar um Value não-consecutivo ao vizinho com ponto.
+% Cenário: ponto liga à casa com 2, mas passamos Value=4 (distância 2 do vizinho).
+test(negative_kropki_rejects_non_consecutive_value, [fail]) :-
+    blank_puzzle(5, Puzzle0),
+    set_dot(Puzzle0, 2, 2, 2, 1, Puzzle),   % ponto vertical entre (2,2) e (3,2); DotVal=2
+    blank_board(5, Board0),
+    set_cell(Board0, 2, 1, 2, Board1),       % vizinho com ponto na pos (2,1) = 2
+    set_cell(Board1, 1, 2, 4, Board),        % vizinho sem ponto acima
+    % Value=4 não é consecutivo a DotVal=2 → deve falhar
+    explicador:negative_kropki_forced(Puzzle, Board, 2, 2, 4, _).
+
+% alternative_eliminated não deve validar quando Value não é consecutivo ao Neighbor.
+% Cenário: Neighbor=2, Value=4 — distância 2, não 1.
+test(alternative_eliminated_rejects_non_consecutive_value, [fail]) :-
+    blank_board(5, Board),
+    % Neighbor=2, Value=4 → 4-2=2, não consecutivo → deve falhar
+    explicador:alternative_eliminated(2, 4, 5, Board, 0, 0).
+
 set_test_clue(Side, Index, Value, Puzzle0, Puzzle) :-
     Puzzle0 = [Top0, Bottom0, Left0, Right0, HDots, VDots],
     (   Side = top
