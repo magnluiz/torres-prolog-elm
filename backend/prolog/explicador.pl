@@ -45,15 +45,97 @@ explain_cell_deductive(Puzzle, Board, Row, Col, Value, Explanation) :-
 
     ->  build_explanation(single_in_col, [Col1, Value], Explanation)
 
-        % Caso 3: É forçada por um ponto Kropki com vizinho conhecido
+        % Caso 3: É forçada pela interseção de dois pontos Kropki
+    ;   double_dot_forced(Puzzle, Board, Row, Col, Value, Explanation)
+
+    ->  true
+
+        % Caso 4: É forçada por um ponto Kropki com vizinho conhecido
     ;   kropki_dot_forced(Puzzle, Board, Row, Col, Value, Explanation)
 
     ->  true
 
-        % Caso 4: É forçada por uma pista de borda
+        % Caso 5: É forçada por uma pista de borda
     ;   edge_clue_forced(Puzzle, Row, Col, Value, N, Explanation)
 
     ->  true
+    ).
+
+%!  double_dot_forced(+Puzzle, +Board, +Row, +Col, +Value, -Explanation) is semidet.
+%   Verifica se a célula possui dois vizinhos preenchidos com ponto Kropki cuja
+%   interseção dos candidatos obriga um único valor.
+double_dot_forced(Puzzle, Board, Row, Col, Value, Explanation) :-
+    length(Board, N),
+    findall(
+        neighbor(NR, NC, NV),
+        dot_neighbor(Puzzle, Board, Row, Col, NR, NC, NV),
+        Neighbors
+    ),
+    Neighbors = [_, _ | _],
+    select(neighbor(R1, C1, V1), Neighbors, Rest),
+    member(neighbor(R2, C2, V2), Rest),
+    kropki_cands(V1, N, Cands1),
+    kropki_cands(V2, N, Cands2),
+    intersection(Cands1, Cands2, [Value]),
+    !,
+    R1_1 is R1 + 1, C1_1 is C1 + 1,
+    R2_1 is R2 + 1, C2_1 is C2 + 1,
+    build_explanation(double_dot, [R1_1, C1_1, V1, R2_1, C2_1, V2, Value], Explanation).
+
+%!  kropki_cands(+NeighborValue, +N, -Candidates) is det.
+%   Gera a lista de alturas candidatas (entre 1 e N) que diferem por 1
+%   do valor do vizinho.
+kropki_cands(V, N, Cands) :-
+    Low is V - 1,
+    High is V + 1,
+    findall(C, (member(C, [Low, High]), C >= 1, C =< N), Cands).
+
+%!  dot_neighbor(+Puzzle, +Board, +Row, +Col, -NRow, -NCol, -NeighborValue) is nondet.
+%   Localiza qualquer casa vizinha (nas 4 direções) que compartilhe um ponto
+%   Kropki com (Row, Col) e que já esteja preenchida no tabuleiro.
+dot_neighbor(Puzzle, Board, Row, Col, NRow, NCol, Neighbor) :-
+    Puzzle = [_, _, _, _, HDots, VDots],
+    length(Board, N),
+    MaxIndex is N - 1,
+    (   % Esquerda
+        Col > 0, ColLeft is Col - 1,
+        nth0(Row, HDots, HRow), 
+        nth0(ColLeft, HRow, 1),
+
+        nth0(Row, Board, BRow), 
+        nth0(ColLeft, BRow, Neighbor),
+
+        Neighbor > 0, NRow = Row, NCol = ColLeft
+
+    ;   % Direita
+        Col < MaxIndex, ColRight is Col + 1,
+        nth0(Row, HDots, HRow), 
+        nth0(Col, HRow, 1),
+
+        nth0(Row, Board, BRow), 
+        nth0(ColRight, BRow, Neighbor),
+
+        Neighbor > 0, NRow = Row, NCol = ColRight
+
+    ;   % Acima
+        Row > 0, RowUp is Row - 1,
+        nth0(RowUp, VDots, VRow), 
+        nth0(Col, VRow, 1),
+
+        nth0(RowUp, Board, BRowUp), 
+        nth0(Col, BRowUp, Neighbor),
+
+        Neighbor > 0, NRow = RowUp, NCol = Col
+
+    ;   % Abaixo
+        Row < MaxIndex, RowDown is Row + 1,
+        nth0(Row, VDots, VRow), 
+        nth0(Col, VRow, 1),
+
+        nth0(RowDown, Board, BRowDown), 
+        nth0(Col, BRowDown, Neighbor),
+
+        Neighbor > 0, NRow = RowDown, NCol = Col
     ).
 
 %!  kropki_dot_forced(+Puzzle, +Board, +Row, +Col, +Value, -Explanation) is semidet.
@@ -246,5 +328,10 @@ message(
 message(
     general_case,
     'A altura ~w na posição (~w, ~w) é a única compatível simultaneamente com as pistas e os pontos.'
+).
+
+message(
+    double_dot,
+    'Os pontos Kropki ligam esta posição às casas (~w, ~w) [altura ~w] e (~w, ~w) [altura ~w]. A única altura com diferença de 1 para ambas é a ~w.'
 ).
 % ==================================================================================================
