@@ -64,6 +64,50 @@ explain_cell_deductive(Puzzle, Board, Row, Col, Value, Explanation) :-
     ;   opposite_clues_forced(Puzzle, Row, Col, Value, N, Explanation)
 
     ->  true
+
+        % Caso 7: É a única posição possível para esta altura na linha ou coluna
+    ;   hidden_single(Board, Row, Col, Value, Explanation)
+
+    ->  true
+    ).
+
+%!  hidden_single(+Board, +Row, +Col, +Value, -Explanation) is semidet.
+%   Tem sucesso quando Value não pode ir a nenhuma outra casa vazia
+%   da linha Row (ou coluna Col), deixando (Row, Col) como única opção.
+hidden_single(Board, Row, Col, Value, Explanation) :-
+    Row1 is Row + 1,
+    Col1 is Col + 1,
+
+    (   % Caso Linha: só esta coluna pode receber Value na linha Row
+        nth0(Row, Board, BRow),
+        \+ member(Value, BRow),
+        transpose(Board, Cols),
+        findall(
+            C,
+            (
+                nth0(C, BRow, 0),
+                C =\= Col,
+                nth0(C, Cols, BCol),
+                \+ member(Value, BCol)
+            ),
+            OtherOptions),
+        OtherOptions = []
+
+    ->  build_explanation(hidden_single_row, [Value, Row1, Col1], Explanation)
+
+        % Caso Coluna: só esta linha pode receber Value na coluna Col
+    ;   transpose(Board, Cols),
+        nth0(Col, Cols, BCol),
+        \+ member(Value, BCol),
+        findall(R,
+            (   nth0(R, BCol, 0),
+                R =\= Row,
+                nth0(R, Board, BRow),
+                \+ member(Value, BRow)
+            ),
+            OtherOptions),
+        OtherOptions = []
+    ->  build_explanation(hidden_single_col, [Value, Col1, Row1], Explanation)
     ).
 
 %!  double_dot_forced(+Puzzle, +Board, +Row, +Col, +Value, -Explanation) is semidet.
@@ -381,5 +425,15 @@ message(
 message(
     opposite_clues_col,
     'O prédio mais alto (~w) esconde os demais atrás dele. Para conseguir ver ~w prédios de cima e ~w de baixo na coluna ~w, ele precisa ter ~w prédios antes e ~w depois, ficando obrigatoriamente na linha ~w.'
+).
+
+message(
+    hidden_single_row,
+    'A altura ~w não cabe em nenhuma outra casa disponível na linha ~w. A coluna ~w é a única opção restante.'
+).
+
+message(
+    hidden_single_col,
+    'A altura ~w não cabe em nenhuma outra casa disponível na coluna ~w. A linha ~w é a única opção restante.'
 ).
 % ==================================================================================================
