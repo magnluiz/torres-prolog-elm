@@ -18,10 +18,13 @@ backend:            ## só o backend: http://localhost:8000/docs
 frontend:           ## só o frontend: http://localhost:5173
 	cd frontend && npm run dev
 
-test: test-prolog test-backend
+test: test-prolog test-explicador test-backend
 
 test-prolog:
 	swipl -g run_tests -t halt backend/prolog/test_torres.pl
+
+test-explicador:
+	swipl -g run_tests -t halt backend/prolog/test_explicador.pl
 
 test-backend:
 	cd backend && uv run pytest
