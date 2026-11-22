@@ -67,7 +67,12 @@ explain_cell_deductive(Puzzle, Board, Row, Col, Value, Priority, Explanation) :-
 
     ->  Priority = 3
 
-        % Caso 7: É a única posição possível para esta altura na linha ou coluna (Prioridade 4)
+        % Caso 7: É forçada pela ausência de ponto Kropki (Prioridade 3)
+    ;   negative_kropki_forced(Puzzle, Board, Row, Col, Value, Explanation)
+
+    ->  Priority = 3
+
+        % Caso 8: É a única posição possível para esta altura na linha ou coluna (Prioridade 4)
     ;   hidden_single(Board, Row, Col, Value, Explanation)
 
     ->  Priority = 4
@@ -186,6 +191,77 @@ dot_neighbor(Puzzle, Board, Row, Col, NRow, NCol, Neighbor) :-
         nth0(RowDown, Board, BRowDown), 
         nth0(Col, BRowDown, Neighbor),
 
+        Neighbor > 0, NRow = RowDown, NCol = Col
+    ).
+
+%!  negative_kropki_forced(+Puzzle, +Board, +Row, +Col, +Value, -Explanation) is semidet.
+%   Identifica quando um vizinho com ponto Kropki deixa duas opções {Value, AltOption},
+%   mas a ausência de ponto (Dot = 0) com um vizinho adjacente proíbe AltOption (pois seriam consecutivos).
+negative_kropki_forced(Puzzle, Board, Row, Col, Value, Explanation) :-
+    length(Board, N),
+
+    % 1. Localiza um vizinho preenchido com ponto Kropki
+    dot_neighbor(Puzzle, Board, Row, Col, DotR, DotC, DotVal),
+
+    % 2. Descobre qual seria a outra opção viável de diferença 1
+    (   Value =:= DotVal + 1
+    ->  AltOption is DotVal - 1
+    ;   AltOption is DotVal + 1
+    ),
+    between(1, N, AltOption),
+
+    % 3. Localiza um vizinho preenchido SEM PONTO que colide com a outra opção
+    no_dot_neighbor(Puzzle, Board, Row, Col, NoDotR, NoDotC, NoDotVal),
+    \+ (NoDotR =:= DotR, NoDotC =:= DotC),
+    Diff is abs(AltOption - NoDotVal),
+    Diff =:= 1,
+    !,
+    
+    DotR1 is DotR + 1, DotC1 is DotC + 1,
+    NoDotR1 is NoDotR + 1, NoDotC1 is NoDotC + 1,
+    OptLow is min(Value, AltOption),
+    OptHigh is max(Value, AltOption),
+
+    build_explanation(negative_kropki,
+        [DotR1, DotC1, DotVal, OptLow, OptHigh, NoDotR1, NoDotC1, NoDotVal, AltOption, Value],
+        Explanation).
+
+%!  no_dot_neighbor(+Puzzle, +Board, +Row, +Col, -NRow, -NCol, -NeighborValue) is nondet.
+%   Localiza qualquer casa vizinha preenchida que não possua ponto Kropki (Dot = 0).
+no_dot_neighbor(Puzzle, Board, Row, Col, NRow, NCol, Neighbor) :-
+    Puzzle = [_, _, _, _, HDots, VDots],
+    length(Board, N),
+    MaxIndex is N - 1,
+    (   % Esquerda sem ponto
+        Col > 0, ColLeft is Col - 1,
+        nth0(Row, HDots, HRow), 
+        nth0(ColLeft, HRow, 0),
+        nth0(Row, Board, BRow), 
+        nth0(ColLeft, BRow, Neighbor),
+        Neighbor > 0, NRow = Row, NCol = ColLeft
+
+    ;   % Direita sem ponto
+        Col < MaxIndex, ColRight is Col + 1,
+        nth0(Row, HDots, HRow), 
+        nth0(Col, HRow, 0),
+        nth0(Row, Board, BRow), 
+        nth0(ColRight, BRow, Neighbor),
+        Neighbor > 0, NRow = Row, NCol = ColRight
+
+    ;   % Acima sem ponto
+        Row > 0, RowUp is Row - 1,
+        nth0(RowUp, VDots, VRow), 
+        nth0(Col, VRow, 0),
+        nth0(RowUp, Board, BRowUp), 
+        nth0(Col, BRowUp, Neighbor),
+        Neighbor > 0, NRow = RowUp, NCol = Col
+
+    ;   % Abaixo sem ponto
+        Row < MaxIndex, RowDown is Row + 1,
+        nth0(Row, VDots, VRow), 
+        nth0(Col, VRow, 0),
+        nth0(RowDown, Board, BRowDown), 
+        nth0(Col, BRowDown, Neighbor),
         Neighbor > 0, NRow = RowDown, NCol = Col
     ).
 
@@ -437,5 +513,10 @@ message(
 message(
     hidden_single_col,
     'A altura ~w não cabe em nenhuma outra casa disponível na coluna ~w. A linha ~w é a única opção restante.'
+).
+
+message(
+    negative_kropki,
+    'O ponto com (~w, ~w) [altura ~w] permite ~w ou ~w. Porém, a ausência de ponto com (~w, ~w) [altura ~w] proíbe o ~w (pois seriam consecutivos). Resta apenas o ~w.'
 ).
 % ==================================================================================================

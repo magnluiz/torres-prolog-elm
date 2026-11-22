@@ -97,6 +97,28 @@ test(explain_cell_uses_direct_double_dot_deduction) :-
     once(sub_string(Explanation, _, _, _, "Os pontos Kropki")),
     once(sub_string(Explanation, _, _, _, "é a 3")).
 
+test(negative_kropki_deduction) :-
+    blank_puzzle(5, Puzzle0),
+    set_dot(Puzzle0, 2, 2, 2, 1, Puzzle),
+    blank_board(5, Board0),
+    set_cell(Board0, 2, 1, 2, Board1),
+    set_cell(Board1, 1, 2, 4, Board),
+    explicador:negative_kropki_forced(Puzzle, Board, 2, 2, 1, Explanation),
+    once(sub_string(Explanation, _, _, _, "permite 1 ou 3")),
+    once(sub_string(Explanation, _, _, _, "ausência de ponto")),
+    once(sub_string(Explanation, _, _, _, "proíbe o 3")),
+    once(sub_string(Explanation, _, _, _, "Resta apenas o 1")).
+
+test(explain_cell_uses_negative_kropki_deduction) :-
+    blank_puzzle(5, Puzzle0),
+    set_dot(Puzzle0, 2, 2, 2, 1, Puzzle),
+    blank_board(5, Board0),
+    set_cell(Board0, 2, 1, 2, Board1),
+    set_cell(Board1, 1, 2, 4, Board),
+    explicador:explain_cell_deductive(Puzzle, Board, 2, 2, 1, Priority, Explanation),
+    Priority =:= 3,
+    once(sub_string(Explanation, _, _, _, "ausência de ponto")).
+
 test(explain_cell_deductive_fails_without_direct_rule, [fail]) :-
     blank_puzzle(5, Puzzle),
     blank_board(5, Board),
