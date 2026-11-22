@@ -17,11 +17,35 @@ const THEME_KEY = "torres-theme";
 const savedTheme = localStorage.getItem(THEME_KEY);
 const systemIsDark = window.matchMedia("(prefers-color-scheme: dark)").matches;
 const darkTheme = savedTheme ? savedTheme === "dark" : systemIsDark;
+const BEST_TIMES_KEY = "torres-best-times";
+
+function loadBestTimes() {
+  try {
+    const saved = JSON.parse(localStorage.getItem(BEST_TIMES_KEY) || "{}") || {};
+    const validSeconds = (value) =>
+      Number.isInteger(value) && value >= 0 ? value : null;
+
+    return {
+      easy: validSeconds(saved.easy),
+      medium: validSeconds(saved.medium),
+      hard: validSeconds(saved.hard),
+    };
+  } catch {
+    return { easy: null, medium: null, hard: null };
+  }
+}
 
 // `flags` é entregue à função `init` do Elm (veja o tipo Flags em Main.elm).
-Elm.Main.init({
+const app = Elm.Main.init({
   node: document.getElementById("app"),
-  flags: { darkTheme },
+  flags: {
+    darkTheme,
+    bestTimes: loadBestTimes(),
+  },
+});
+
+app.ports.saveBestTimes.subscribe((bestTimes) => {
+  localStorage.setItem(BEST_TIMES_KEY, JSON.stringify(bestTimes));
 });
 
 // Guarda a escolha quando o botão de tema muda. Ouvimos o evento no

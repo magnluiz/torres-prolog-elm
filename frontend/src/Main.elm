@@ -1,4 +1,4 @@
-module Main exposing (main)
+port module Main exposing (main)
 
 {-| Interface gráfica das Torres Latinas, na Arquitetura Elm:
 
@@ -16,8 +16,15 @@ import Html exposing (Html, aside, button, details, div, footer, h1, header, inp
 import Html.Attributes exposing (attribute, checked, class, classList, disabled, type_, value)
 import Html.Events exposing (onCheck, onClick)
 import Json.Decode as Decode exposing (Decoder)
+import Json.Encode as Encode
 import Set exposing (Set)
+import Statistics
+import Task
+import Time
 import Towers exposing (Board, Cell(..), Clue(..), ClueStatus(..), Position, Puzzle, Side(..))
+
+
+port saveBestTimes : Encode.Value -> Cmd msg
 
 
 
@@ -42,6 +49,7 @@ main =
 -}
 type alias Flags =
     { darkTheme : Bool
+    , bestTimes : Statistics.BestTimes
     }
 
 
@@ -51,6 +59,7 @@ type alias Model =
     , mode : InputMode
     , status : Status
     , darkTheme : Bool
+    , bestTimes : Statistics.BestTimes
     }
 
 
@@ -63,6 +72,12 @@ type alias Game =
     { puzzle : Puzzle
     , board : Board
     , selected : Maybe Position
+    , difficulty : Difficulty
+    , startedAt : Maybe Time.Posix
+    , elapsedSeconds : Int
+    , hintsUsed : Int
+    , solverUsed : Bool
+    , finished : Bool
     }
 
 
@@ -95,6 +110,7 @@ init flags =
       , mode = Heights
       , status = Thinking
       , darkTheme = flags.darkTheme
+      , bestTimes = flags.bestTimes
       }
     , Api.generate Medium GotPuzzle
     )
@@ -119,6 +135,8 @@ type Msg
     | GotSolution (Result String (List (List Int)))
     | ResetRequested
     | ErrorDismissed
+    | ClockStarted Time.Posix
+    | Tick Time.Posix
 
 
 update : Msg -> Model -> ( Model, Cmd Msg )
@@ -131,10 +149,21 @@ update msg model =
 
         GotPuzzle (Ok puzzle) ->
             ( { model
-                | game = Just { puzzle = puzzle, board = Towers.emptyBoard puzzle, selected = Nothing }
+                | game =
+                    Just
+                        { puzzle = puzzle
+                        , board = Towers.emptyBoard puzzle
+                        , selected = Nothing
+                        , difficulty = model.difficulty
+                        , startedAt = Nothing
+                        , elapsedSeconds = 0
+                        , hintsUsed = 0
+                        , solverUsed = False
+                        , finished = False
+                        }
                 , status = Idle
               }
-            , Cmd.none
+            , Task.perform ClockStarted Time.now
             )
 
         GotPuzzle (Err error) ->
@@ -144,36 +173,46 @@ update msg model =
             ( updateGame (\game -> { game | selected = Just position }) model, Cmd.none )
 
         HeightPressed height ->
-            let
-                change =
-                    case model.mode of
-                        Heights ->
-                            Towers.placeHeight Placed height
+            if boardInputLocked model then
+                ( model, Cmd.none )
 
-                        Candidates ->
-                            \position -> Towers.toggleMark position height
+            else
+                let
+                    change =
+                        case model.mode of
+                            Heights ->
+                                Towers.placeHeight Placed height
 
-                -- As teclas vão de 1 a 9, mas a grade só de 4 a 6: alturas
-                -- maiores que a grade são ignoradas.
-                fits game =
-                    height <= Towers.size game.puzzle
-            in
-            ( updateGame
-                (\game ->
-                    if fits game then
-                        changeSelected change game
+                            Candidates ->
+                                \position -> Towers.toggleMark position height
 
-                    else
-                        game
-                )
-                model
-            , Cmd.none
-            )
+                    -- Ignora alturas maiores que o tamanho da grade.
+                    fits game =
+                        height <= Towers.size game.puzzle
+
+                    updatedModel =
+                        updateGame
+                            (\game ->
+                                if fits game then
+                                    changeSelected change game
+
+                                else
+                                    game
+                            )
+                            model
+                in
+                finishIfComplete updatedModel
 
         ErasePressed ->
-            ( updateGame (changeSelected (\position -> Towers.setCell position Empty)) model
-            , Cmd.none
-            )
+            if boardInputLocked model then
+                ( model, Cmd.none )
+
+            else
+                finishIfComplete
+                    (updateGame
+                        (changeSelected (\position -> Towers.setCell position Empty))
+                        model
+                    )
 
         ModeToggled ->
             ( { model | mode = toggleMode model.mode }, Cmd.none )
@@ -190,16 +229,17 @@ update msg model =
             askProlog Api.hint GotHint model
 
         GotHint (Ok { row, col, value }) ->
-            ( updateGame
-                (\game ->
-                    { game
-                        | board = Towers.placeHeight Revealed value ( row, col ) game.board
-                        , selected = Just ( row, col )
-                    }
+            finishIfComplete
+                (updateGame
+                    (\game ->
+                        { game
+                            | board = Towers.placeHeight Revealed value ( row, col ) game.board
+                            , selected = Just ( row, col )
+                            , hintsUsed = game.hintsUsed + 1
+                        }
+                    )
+                    { model | status = Idle }
                 )
-                { model | status = Idle }
-            , Cmd.none
-            )
 
         GotHint (Err error) ->
             ( { model | status = Failed error }, Cmd.none )
@@ -211,21 +251,131 @@ update msg model =
             askProlog (\puzzle _ -> Api.solve puzzle (Towers.emptyBoard puzzle)) GotSolution model
 
         GotSolution (Ok solution) ->
-            ( updateGame (\game -> { game | board = Towers.revealSolution solution game.board })
-                { model | status = Idle }
-            , Cmd.none
-            )
+            finishIfComplete
+                (updateGame
+                    (\game ->
+                        { game
+                            | board = Towers.revealSolution solution game.board
+                            , solverUsed = True
+                        }
+                    )
+                    { model | status = Idle }
+                )
 
         GotSolution (Err error) ->
             ( { model | status = Failed error }, Cmd.none )
 
         ResetRequested ->
-            ( updateGame (\game -> { game | board = Towers.emptyBoard game.puzzle }) { model | status = Idle }
-            , Cmd.none
-            )
+            if boardInputLocked model then
+                ( model, Cmd.none )
+
+            else
+                ( updateGame
+                    (\game -> { game | board = Towers.emptyBoard game.puzzle })
+                    { model | status = Idle }
+                , Cmd.none
+                )
 
         ErrorDismissed ->
             ( { model | status = Idle }, Cmd.none )
+
+        ClockStarted startedAt ->
+            finishIfComplete
+                (updateGame (\game -> { game | startedAt = Just startedAt }) model)
+
+        Tick now ->
+            updateTimer now model
+
+
+updateTimer : Time.Posix -> Model -> ( Model, Cmd Msg )
+updateTimer now model =
+    case model.game of
+        Just game ->
+            case game.startedAt of
+                Just startedAt ->
+                    if game.finished then
+                        ( model, Cmd.none )
+
+                    else
+                        let
+                            elapsed =
+                                Statistics.elapsedSeconds startedAt now
+
+                            updatedModel =
+                                updateGame
+                                    (\current -> { current | elapsedSeconds = elapsed })
+                                    model
+                        in
+                        finishIfComplete updatedModel
+
+                Nothing ->
+                    ( model, Cmd.none )
+
+        Nothing ->
+            ( model, Cmd.none )
+
+
+finishIfComplete : Model -> ( Model, Cmd Msg )
+finishIfComplete model =
+    case model.game of
+        Just game ->
+            case game.startedAt of
+                Just _ ->
+                    if game.finished || not (Towers.isComplete game.puzzle game.board) then
+                        ( model, Cmd.none )
+
+                    else
+                        let
+                            finishedGame =
+                                { game | finished = True }
+
+                            finishedModel =
+                                { model | game = Just finishedGame }
+
+                            updatedRecords =
+                                Statistics.recordIfEligible
+                                    game.difficulty
+                                    game.elapsedSeconds
+                                    game.hintsUsed
+                                    game.solverUsed
+                                    model.bestTimes
+                        in
+                        if updatedRecords == model.bestTimes then
+                            ( finishedModel, Cmd.none )
+
+                        else
+                            let
+                                modelWithRecord =
+                                    { finishedModel | bestTimes = updatedRecords }
+                            in
+                            ( modelWithRecord
+                            , saveBestTimes (encodeBestTimes updatedRecords)
+                            )
+
+                Nothing ->
+                    ( model, Cmd.none )
+
+        Nothing ->
+            ( model, Cmd.none )
+
+
+encodeBestTimes : Statistics.BestTimes -> Encode.Value
+encodeBestTimes records =
+    Encode.object
+        [ ( "easy", encodeMaybeInt records.easy )
+        , ( "medium", encodeMaybeInt records.medium )
+        , ( "hard", encodeMaybeInt records.hard )
+        ]
+
+
+encodeMaybeInt : Maybe Int -> Encode.Value
+encodeMaybeInt maybeSeconds =
+    case maybeSeconds of
+        Just seconds ->
+            Encode.int seconds
+
+        Nothing ->
+            Encode.null
 
 
 {-| Aplica uma alteração à partida, se houver uma. `Maybe.map` faz
@@ -292,8 +442,30 @@ toggleMode mode =
 
 
 subscriptions : Model -> Sub Msg
-subscriptions _ =
-    Browser.Events.onKeyDown keyDecoder
+subscriptions model =
+    Sub.batch
+        [ Browser.Events.onKeyDown keyDecoder
+        , timerSubscription model
+        ]
+
+
+timerSubscription : Model -> Sub Msg
+timerSubscription model =
+    case model.game of
+        Just game ->
+            case game.startedAt of
+                Just _ ->
+                    if game.finished then
+                        Sub.none
+
+                    else
+                        Time.every 1000 Tick
+
+                Nothing ->
+                    Sub.none
+
+        Nothing ->
+            Sub.none
 
 
 {-| Teclas que não nos interessam fazem o decoder FALHAR, e um decoder que
@@ -380,6 +552,8 @@ view model =
                     [ span [ class "panel-label" ] [ text "Novo jogo" ]
                     , viewDifficulty model
                     , div [ class "message-area" ] [ viewMessages model ]
+                    , span [ class "panel-label" ] [ text "Estatísticas" ]
+                    , viewStatistics model
                     , span [ class "panel-label" ] [ text "Alturas" ]
                     , viewHeightPad model
                     , span [ class "panel-label" ] [ text "Ajuda" ]
@@ -426,6 +600,18 @@ kbd =
 isThinking : Model -> Bool
 isThinking model =
     model.status == Thinking
+
+
+boardInputLocked : Model -> Bool
+boardInputLocked model =
+    isThinking model
+        || (case model.game of
+                Just game ->
+                    game.finished || Towers.isComplete game.puzzle game.board
+
+                Nothing ->
+                    True
+           )
 
 
 viewDifficulty : Model -> Html Msg
@@ -662,13 +848,16 @@ viewHeightPad model =
         noSelection =
             Maybe.andThen .selected model.game == Nothing
 
+        inputDisabled =
+            noSelection || boardInputLocked model
+
         maxHeight =
             Maybe.map (.puzzle >> Towers.size) model.game |> Maybe.withDefault 0
 
         heightKey n =
             button
                 [ class "number-key"
-                , disabled noSelection
+                , disabled inputDisabled
                 , onClick (HeightPressed n)
                 ]
                 [ text (String.fromInt n) ]
@@ -678,7 +867,12 @@ viewHeightPad model =
     in
     div [ class "number-pad" ]
         (List.map heightKey (List.range 1 maxHeight)
-            ++ [ button [ class "erase-key", disabled noSelection, onClick ErasePressed ] [ text "⌫" ]
+            ++ [ button
+                    [ class "erase-key"
+                    , disabled inputDisabled
+                    , onClick ErasePressed
+                    ]
+                    [ text "⌫" ]
                , button
                     [ class "mode-toggle"
                     , classList [ ( "mode-toggle--on", marking ) ]
@@ -713,7 +907,7 @@ viewActions model =
     div [ class "actions" ]
         [ button [ class "action-button action-button--hint", disabled nothingToAsk, onClick HintRequested ] [ text "Dica" ]
         , button [ class "action-button action-button--solve", disabled nothingToAsk, onClick SolveRequested ] [ text "Resolver" ]
-        , button [ class "action-button action-button--reset", disabled (isThinking model), onClick ResetRequested ] [ text "Limpar" ]
+        , button [ class "action-button action-button--reset", disabled (boardInputLocked model), onClick ResetRequested ] [ text "Limpar" ]
         ]
 
 
@@ -728,3 +922,32 @@ viewRules =
             ]
         , p [] [ text "Números na borda ficam verdes quando a linha cumpre a pista e vermelhos quando não cumpre." ]
         ]
+
+
+viewStatistics : Model -> Html Msg
+viewStatistics model =
+    case model.game of
+        Just game ->
+            let
+                best =
+                    Statistics.bestTimeFor game.difficulty model.bestTimes
+                        |> Maybe.map Statistics.formatTime
+                        |> Maybe.withDefault "—"
+            in
+            div [ class "game-stats" ]
+                [ p [ class "game-stat" ]
+                    [ span [] [ text "Tempo" ]
+                    , span [] [ text (Statistics.formatTime game.elapsedSeconds) ]
+                    ]
+                , p [ class "game-stat" ]
+                    [ span [] [ text "Dicas usadas" ]
+                    , span [] [ text (String.fromInt game.hintsUsed) ]
+                    ]
+                , p [ class "game-stat" ]
+                    [ span [] [ text "Recorde sem ajuda" ]
+                    , span [] [ text best ]
+                    ]
+                ]
+
+        Nothing ->
+            text ""
