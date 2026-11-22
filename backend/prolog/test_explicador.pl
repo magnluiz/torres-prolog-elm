@@ -13,7 +13,8 @@ test(single_missing_height_in_row) :-
     blank_puzzle(5, Puzzle),
     blank_board(5, Board0),
     set_row(Board0, 0, [1, 2, 3, 4, 0], Board),
-    explicador:explain_cell_deductive(Puzzle, Board, 0, 4, 5, Explanation),
+    explicador:explain_cell_deductive(Puzzle, Board, 0, 4, 5, Priority, Explanation),
+    Priority =:= 1,
     once(sub_string(Explanation, _, _, _, "Na linha 1")),
     once(sub_string(Explanation, _, _, _, "Resta apenas a 5")).
 
@@ -24,7 +25,8 @@ test(single_missing_height_in_column) :-
              [3,0,0,0,0],
              [4,0,0,0,0],
              [0,0,0,0,0]],
-    explicador:explain_cell_deductive(Puzzle, Board, 4, 0, 5, Explanation),
+    explicador:explain_cell_deductive(Puzzle, Board, 4, 0, 5, Priority, Explanation),
+    Priority =:= 1,
     once(sub_string(Explanation, _, _, _, "Na coluna 1")),
     once(sub_string(Explanation, _, _, _, "Resta apenas a 5")).
 
@@ -90,14 +92,15 @@ test(edge_clue_five_forces_ascending_order_on_every_side,
 
 test(explain_cell_uses_direct_double_dot_deduction) :-
     double_dot_fixture(horizontal, Puzzle, Board, Row, Col),
-    explicador:explain_cell_deductive(Puzzle, Board, Row, Col, 3, Explanation),
+    explicador:explain_cell_deductive(Puzzle, Board, Row, Col, 3, Priority, Explanation),
+    Priority =:= 3,
     once(sub_string(Explanation, _, _, _, "Os pontos Kropki")),
     once(sub_string(Explanation, _, _, _, "é a 3")).
 
 test(explain_cell_deductive_fails_without_direct_rule, [fail]) :-
     blank_puzzle(5, Puzzle),
     blank_board(5, Board),
-    explicador:explain_cell_deductive(Puzzle, Board, 2, 2, 3, _).
+    explicador:explain_cell_deductive(Puzzle, Board, 2, 2, 3, _, _).
 
 test(explain_cell_provides_general_explanation) :-
     blank_puzzle(5, Puzzle),

@@ -351,14 +351,14 @@ hint(Puzzle, Board, Result) :-
         (   Empty == []
         ->  Result = complete
 
-        ;   % Caso 1: Procura por deduções diretas (casos 1 a 4 do explicador)
+        ;   % Caso 1: Procura por deduções diretas com prioridade pedagógica
            findall(
-                candidate(Row, Col, Value, Explanation),
+                candidate(Priority, Row, Col, Value, Explanation),
                 (
                     member(Row-Col, Empty),
                     nth0(Row, Solution, SolutionRow),
                     nth0(Col, SolutionRow, Value),
-                    explain_cell_deductive(Puzzle, Board, Row, Col, Value, Explanation)
+                    explain_cell_deductive(Puzzle, Board, Row, Col, Value, Priority, Explanation)
                 ),
                 DeductiveCandidates
             ),
@@ -366,9 +366,17 @@ hint(Puzzle, Board, Result) :-
             % Caso 2: Se não houver deduções diretas, recorre ao caso geral do explicador
             (   DeductiveCandidates \= []
 
-                ->  random_member(
-                        candidate(Row, Col, Value, Explanation), 
-                        DeductiveCandidates
+                ->  % Pega somente as de menor prioridade (mais fáceis)
+                    findall(P, member(candidate(P, _, _, _, _), DeductiveCandidates), Priorities),
+                    min_list(Priorities, MinP),
+                    findall(
+                        candidate(MinP, R, C, V, E),
+                        member(candidate(MinP, R, C, V, E), DeductiveCandidates),
+                        BestCandidates
+                    ),
+                    random_member(
+                        candidate(_, Row, Col, Value, Explanation), 
+                        BestCandidates
                     ),
                     Result = [Row, Col, Value, Explanation]
                 
@@ -388,7 +396,6 @@ empty_positions(Board, Positions) :-
             ( nth0(R, Board, Row),
               nth0(C, Row, 0) ),
             Positions).
-
 
 /* =========================================================================
    5. UTILITÁRIOS PARA USO NO TERMINAL

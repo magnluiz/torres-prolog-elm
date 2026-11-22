@@ -2,14 +2,14 @@
     Analisa as restrições e gera justificativas em linguagem natural.
 */
 
-:- module(explicador, [explain_cell/6, explain_cell_deductive/6]).
+:- module(explicador, [explain_cell/6, explain_cell_deductive/7]).
 :- use_module(library(clpfd)).
 :- use_module(library(lists)).
 
 %!  explain_cell(+Puzzle, +Board, +Row, +Col, +Value, -Explanation) is det.
 %  Examina a célula (Row, Col) do tabuleiro Board e explica por que ela deve receber o valor Value.
 explain_cell(Puzzle, Board, Row, Col, Value, Explanation) :-
-    (   explain_cell_deductive(Puzzle, Board, Row, Col, Value, Explanation)
+    (   explain_cell_deductive(Puzzle, Board, Row, Col, Value, _Priority, Explanation)
 
     ->  true
 
@@ -21,54 +21,56 @@ explain_cell(Puzzle, Board, Row, Col, Value, Explanation) :-
     !.
 
 
-%! explain_cell_deductive(+Puzzle, +Board, +Row, +Col, +Value, -Explanation) is semidet.
-%  Tem sucesso apenas se houver uma dedução pedagógica direta (casos 1 a 4).
-explain_cell_deductive(Puzzle, Board, Row, Col, Value, Explanation) :-
+%! explain_cell_deductive(+Puzzle, +Board, +Row, +Col, +Value, -Priority, -Explanation) is semidet.
+%  Tem sucesso apenas se houver uma dedução pedagógica direta, retornando a prioridade (1 a 4) e a explicação.
+explain_cell_deductive(Puzzle, Board, Row, Col, Value, Priority, Explanation) :-
     length(Board, N),
     Row1 is Row + 1,
     Col1 is Col + 1,
 
-    (   % Caso 1: É a única altura que falta na linha
+    (   % Caso 1: É a única altura que falta na linha (Prioridade 1)
         nth0(Row, Board, FullRow),
         delete(FullRow, 0, PresentRow),
         numlist(1, N, All),
         subtract(All, PresentRow, [Value])
 
-    ->  build_explanation(single_in_row, [Row1, Value], Explanation)
+    ->  Priority = 1,
+        build_explanation(single_in_row, [Row1, Value], Explanation)
 
-        % Caso 2: É a única altura que falta na coluna
+        % Caso 2: É a única altura que falta na coluna (Prioridade 1)
     ;   transpose(Board, Cols),
         nth0(Col, Cols, FullCol),
         delete(FullCol, 0, PresentCol),
         numlist(1, N, AllC),
         subtract(AllC, PresentCol, [Value])
 
-    ->  build_explanation(single_in_col, [Col1, Value], Explanation)
+    ->  Priority = 1,
+        build_explanation(single_in_col, [Col1, Value], Explanation)
 
-        % Caso 3: É forçada pela interseção de dois pontos Kropki
-    ;   double_dot_forced(Puzzle, Board, Row, Col, Value, Explanation)
-
-    ->  true
-
-        % Caso 4: É forçada por um ponto Kropki com vizinho conhecido
+        % Caso 3: É forçada por um ponto Kropki com vizinho conhecido (Prioridade 2)
     ;   kropki_dot_forced(Puzzle, Board, Row, Col, Value, Explanation)
 
-    ->  true
+    ->  Priority = 2
 
-        % Caso 5: É forçada por uma pista de borda
+        % Caso 4: É forçada por uma pista de borda (Prioridade 2)
     ;   edge_clue_forced(Puzzle, Row, Col, Value, N, Explanation)
 
-    ->  true
+    ->  Priority = 2
 
-        % Caso 6: É forçada pela soma de pistas opostas (A + B = N + 1)
+        % Caso 5: É forçada pela interseção de dois pontos Kropki (Prioridade 3)
+    ;   double_dot_forced(Puzzle, Board, Row, Col, Value, Explanation)
+
+    ->  Priority = 3
+
+        % Caso 6: É forçada pela soma de pistas opostas (A + B = N + 1) (Prioridade 3)
     ;   opposite_clues_forced(Puzzle, Row, Col, Value, N, Explanation)
 
-    ->  true
+    ->  Priority = 3
 
-        % Caso 7: É a única posição possível para esta altura na linha ou coluna
+        % Caso 7: É a única posição possível para esta altura na linha ou coluna (Prioridade 4)
     ;   hidden_single(Board, Row, Col, Value, Explanation)
 
-    ->  true
+    ->  Priority = 4
     ).
 
 %!  hidden_single(+Board, +Row, +Col, +Value, -Explanation) is semidet.
