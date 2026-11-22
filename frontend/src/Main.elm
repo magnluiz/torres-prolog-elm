@@ -18,6 +18,8 @@ import Html.Events exposing (onCheck, onClick)
 import Json.Decode as Decode exposing (Decoder)
 import Set exposing (Set)
 import Towers exposing (Board, Cell(..), Clue(..), ClueStatus(..), Position, Puzzle, Side(..))
+import Svg exposing (path, svg)
+import Svg.Attributes as SvgAttr
 
 
 
@@ -62,7 +64,14 @@ chegar, `Model.game` é `Nothing`.
 type alias Game =
     { puzzle : Puzzle
     , board : Board
+    , history : History
     , selected : Maybe Position
+    }
+
+
+type alias History =
+    { past : List Board
+    , future : List Board
     }
 
 
@@ -113,6 +122,8 @@ type Msg
     | ModeToggled
     | ThemeToggled Bool
     | MoveSelection Int Int
+    | UndoPressed
+    | RedoPressed
     | HintRequested
     | GotHint (Result String Api.Hint)
     | SolveRequested
@@ -131,7 +142,13 @@ update msg model =
 
         GotPuzzle (Ok puzzle) ->
             ( { model
-                | game = Just { puzzle = puzzle, board = Towers.emptyBoard puzzle, selected = Nothing }
+                | game =
+                    Just
+                        { puzzle = puzzle
+                        , board = Towers.emptyBoard puzzle
+                        , history = { past = [], future = [] }
+                        , selected = Nothing
+                        }
                 , status = Idle
               }
             , Cmd.none
@@ -186,16 +203,33 @@ update msg model =
         MoveSelection dRow dCol ->
             ( updateGame (moveSelection dRow dCol) model, Cmd.none )
 
+        UndoPressed ->
+            if isThinking model then
+                ( model, Cmd.none )
+
+            else
+                ( updateGame undoGame { model | status = Idle }
+                , Cmd.none
+                )
+
+        RedoPressed ->
+            if isThinking model then
+                ( model, Cmd.none )
+
+            else
+                ( updateGame redoGame { model | status = Idle }
+                , Cmd.none
+                )
+
         HintRequested ->
             askProlog Api.hint GotHint model
 
         GotHint (Ok { row, col, value }) ->
             ( updateGame
                 (\game ->
-                    { game
-                        | board = Towers.placeHeight Revealed value ( row, col ) game.board
-                        , selected = Just ( row, col )
-                    }
+                    recordBoard
+                        (Towers.placeHeight Revealed value ( row, col ) game.board)
+                        { game | selected = Just ( row, col ) }
                 )
                 { model | status = Idle }
             , Cmd.none
@@ -211,7 +245,12 @@ update msg model =
             askProlog (\puzzle _ -> Api.solve puzzle (Towers.emptyBoard puzzle)) GotSolution model
 
         GotSolution (Ok solution) ->
-            ( updateGame (\game -> { game | board = Towers.revealSolution solution game.board })
+            ( updateGame
+                (\game ->
+                    recordBoard
+                        (Towers.revealSolution solution game.board)
+                        game
+                )
                 { model | status = Idle }
             , Cmd.none
             )
@@ -220,7 +259,9 @@ update msg model =
             ( { model | status = Failed error }, Cmd.none )
 
         ResetRequested ->
-            ( updateGame (\game -> { game | board = Towers.emptyBoard game.puzzle }) { model | status = Idle }
+            ( updateGame
+                (\game -> recordBoard (Towers.emptyBoard game.puzzle) game)
+                { model | status = Idle }
             , Cmd.none
             )
 
@@ -234,6 +275,60 @@ exatamente isso: aplica a função dentro do `Just` e deixa `Nothing` como está
 updateGame : (Game -> Game) -> Model -> Model
 updateGame change model =
     { model | game = Maybe.map change model.game }
+
+
+{-| Atualiza o tabuleiro e registra o estado anterior na pilha de "desfazer".
+-}
+recordBoard : Board -> Game -> Game
+recordBoard nextBoard game =
+    if nextBoard == game.board then
+        game
+
+    else
+        { game
+            | board = nextBoard
+            , history =
+                { past = game.board :: game.history.past
+                , future = []
+                }
+        }
+
+
+{-| Desfaz a última jogada, se houver. O tabuleiro atual vai para a pilha de "refazer".
+-}
+undoGame : Game -> Game
+undoGame game =
+    case game.history.past of
+        previousBoard :: remainingPast ->
+            { game
+                | board = previousBoard
+                , history =
+                    { past = remainingPast
+                    , future = game.board :: game.history.future
+                    }
+            }
+
+        [] ->
+            game
+
+
+
+{-| Refaz a última jogada desfeita, se houver. O tabuleiro atual vai para a pilha de "desfazer".
+-}
+redoGame : Game -> Game
+redoGame game =
+    case game.history.future of
+        nextBoard :: remainingFuture ->
+            { game
+                | board = nextBoard
+                , history =
+                    { past = game.board :: game.history.past
+                    , future = remainingFuture
+                    }
+            }
+
+        [] ->
+            game
 
 
 {-| Monta um pedido ao Prolog com o puzzle e o tabuleiro da partida atual.
@@ -258,7 +353,7 @@ changeSelected : (Position -> Board -> Board) -> Game -> Game
 changeSelected change game =
     case game.selected of
         Just position ->
-            { game | board = change position game.board }
+            recordBoard (change position game.board) game
 
         Nothing ->
             game
@@ -301,8 +396,31 @@ falha não gera mensagem nenhuma.
 -}
 keyDecoder : Decoder Msg
 keyDecoder =
-    Decode.field "key" Decode.string
-        |> Decode.andThen keyToMsg
+    Decode.map4 keyToMsgWithModifiers
+        (Decode.field "key" Decode.string)
+        (Decode.field "ctrlKey" Decode.bool)
+        (Decode.field "metaKey" Decode.bool)
+        (Decode.field "shiftKey" Decode.bool)
+        |> Decode.andThen identity
+
+keyToMsgWithModifiers : String -> Bool -> Bool -> Bool -> Decoder Msg
+keyToMsgWithModifiers key ctrlKey metaKey shiftKey =
+    if ctrlKey || metaKey then
+        case ( String.toLower key, shiftKey ) of
+            ( "z", True ) ->
+                Decode.succeed RedoPressed
+
+            ( "z", False ) ->
+                Decode.succeed UndoPressed
+
+            ( "y", _ ) ->
+                Decode.succeed RedoPressed
+
+            _ ->
+                Decode.fail "Atalho ignorado"
+
+    else
+        keyToMsg key
 
 
 keyToMsg : String -> Decoder Msg
@@ -382,6 +500,8 @@ view model =
                     , div [ class "message-area" ] [ viewMessages model ]
                     , span [ class "panel-label" ] [ text "Alturas" ]
                     , viewHeightPad model
+                    , span [ class "panel-label" ] [ text "Histórico" ]
+                    , viewHistoryControls model
                     , span [ class "panel-label" ] [ text "Ajuda" ]
                     , viewActions model
                     , viewRules
@@ -714,6 +834,73 @@ viewActions model =
         [ button [ class "action-button action-button--hint", disabled nothingToAsk, onClick HintRequested ] [ text "Dica" ]
         , button [ class "action-button action-button--solve", disabled nothingToAsk, onClick SolveRequested ] [ text "Resolver" ]
         , button [ class "action-button action-button--reset", disabled (isThinking model), onClick ResetRequested ] [ text "Limpar" ]
+        ]
+
+
+viewHistoryControls : Model -> Html Msg
+viewHistoryControls model =
+    let
+        ( canUndo, canRedo ) =
+            case model.game of
+                Just game ->
+                    ( not (List.isEmpty game.history.past)
+                    , not (List.isEmpty game.history.future)
+                    )
+
+                Nothing ->
+                    ( False, False )
+    in
+    div [ class "history-controls" ]
+        [ button
+            [ class "history-button"
+            , disabled (isThinking model || not canUndo)
+            , onClick UndoPressed
+            , attribute "title" "Desfazer (⌘Z no Mac; Ctrl+Z no Windows/Linux)"
+            ]
+            [ undoIcon, text "Desfazer" ]
+        , button
+            [ class "history-button"
+            , disabled (isThinking model || not canRedo)
+            , onClick RedoPressed
+            , attribute "title" "Refazer (⌘⇧Z no Mac; Ctrl+Y no Windows/Linux)"
+            ]
+            [ redoIcon, text "Refazer" ]
+        ]
+
+
+undoIcon : Html Msg
+undoIcon =
+    svg
+        [ SvgAttr.viewBox "0 0 24 24"
+        , SvgAttr.width "18"
+        , SvgAttr.height "18"
+        , SvgAttr.fill "none"
+        , SvgAttr.stroke "currentColor"
+        , SvgAttr.strokeWidth "2"
+        , SvgAttr.strokeLinecap "round"
+        , SvgAttr.strokeLinejoin "round"
+        , attribute "aria-hidden" "true"
+        ]
+        [ path [ SvgAttr.d "M3 7v6h6" ] []
+        , path [ SvgAttr.d "M21 17a9 9 0 0 0-15-6.7L3 13" ] []
+        ]
+
+
+redoIcon : Html Msg
+redoIcon =
+    svg
+        [ SvgAttr.viewBox "0 0 24 24"
+        , SvgAttr.width "18"
+        , SvgAttr.height "18"
+        , SvgAttr.fill "none"
+        , SvgAttr.stroke "currentColor"
+        , SvgAttr.strokeWidth "2"
+        , SvgAttr.strokeLinecap "round"
+        , SvgAttr.strokeLinejoin "round"
+        , attribute "aria-hidden" "true"
+        ]
+        [ path [ SvgAttr.d "M21 7v6h-6" ] []
+        , path [ SvgAttr.d "M3 17a9 9 0 0 1 15-6.7L21 13" ] []
         ]
 
 
