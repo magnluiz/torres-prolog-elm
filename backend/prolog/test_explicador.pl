@@ -236,11 +236,16 @@ test(edge_ceiling_does_not_force_when_multiple_candidates_remain, [fail]) :-
     blank_board(4, Board), % Nenhum valor preenchido, tanto 1 quanto 2 continuam possíveis
     explicador:edge_height_ceiling_forced(Puzzle, Board, 0, 0, _Value, 4, _Explanation).
 
+% Tabuleiro válido para locked_pair: [[4,0,0,0],[0,3,0,0],[0,0,3,0],[0,0,0,0]]
+% Nenhuma linha ou coluna repete valores. Os 3 estão em linhas 1 e 2 (distintas),
+% colunas 1 e 2 (distintas). Isso elimina 3 de (0,1) via coluna 1, e de (0,2) via
+% coluna 2, formando o par nu {1,2} nessas duas casas e deixando (0,3)=3.
+
 test(locked_pair_row) :-
     blank_board(4, Board0),
     set_cell(Board0, 0, 0, 4, Board1),
-    set_cell(Board1, 1, 1, 3, Board2), % Col 1 já tem 3, então (0,1) só pode ser {1, 2}
-    set_cell(Board2, 1, 2, 3, Board),  % Col 2 já tem 3, então (0,2) só pode ser {1, 2}
+    set_cell(Board1, 1, 1, 3, Board2), % Linha 1 col 1: elimina 3 da coluna 1 → (0,1) ∈ {1,2}
+    set_cell(Board2, 2, 2, 3, Board),  % Linha 2 col 2: elimina 3 da coluna 2 → (0,2) ∈ {1,2}
     explicador:locked_pair_forced(Board, 0, 3, 3, Explanation),
     once(sub_string(Explanation, _, _, _, "Na linha 1")),
     once(sub_string(Explanation, _, _, _, "par exclusivo {1, 2}")),
@@ -249,8 +254,8 @@ test(locked_pair_row) :-
 test(locked_pair_col) :-
     blank_board(4, Board0),
     set_cell(Board0, 0, 0, 4, Board1),
-    set_cell(Board1, 1, 1, 3, Board2), % Linha 1 já tem 3, então (1,0) só pode ser {1, 2}
-    set_cell(Board2, 2, 1, 3, Board),  % Linha 2 já tem 3, então (2,0) só pode ser {1, 2}
+    set_cell(Board1, 1, 1, 3, Board2), % Linha 1 col 1: elimina 3 da linha 1 → (1,0) ∈ {1,2}
+    set_cell(Board2, 2, 2, 3, Board),  % Linha 2 col 2: elimina 3 da linha 2 → (2,0) ∈ {1,2}
     explicador:locked_pair_forced(Board, 3, 0, 3, Explanation),
     once(sub_string(Explanation, _, _, _, "Na coluna 1")),
     once(sub_string(Explanation, _, _, _, "par exclusivo {1, 2}")),
@@ -261,7 +266,7 @@ test(explain_cell_uses_locked_pair_priority_4) :-
     blank_board(4, Board0),
     set_cell(Board0, 0, 0, 4, Board1),
     set_cell(Board1, 1, 1, 3, Board2),
-    set_cell(Board2, 1, 2, 3, Board),
+    set_cell(Board2, 2, 2, 3, Board),
     explicador:explain_cell_deductive(Puzzle, Board, 0, 3, 3, Priority, Explanation),
     Priority =:= 4,
     once(sub_string(Explanation, _, _, _, "par exclusivo {1, 2}")).
@@ -270,6 +275,29 @@ test(locked_pair_does_not_force_without_pair, [fail]) :-
     blank_board(4, Board0),
     set_cell(Board0, 0, 0, 4, Board),
     explicador:locked_pair_forced(Board, 0, 3, _Value, _Explanation).
+
+% ── Prioridade 2: edge_clue_forced via explain_cell_deductive ───────────────────
+% Pista 1 na borda top da coluna 0 obriga (0,0)=4. Deve retornar prioridade 2.
+test(explain_cell_uses_edge_clue_priority_2) :-
+    blank_puzzle(4, Puzzle0),
+    set_test_clue(top, 0, 1, Puzzle0, Puzzle),
+    blank_board(4, Board),
+    explicador:explain_cell_deductive(Puzzle, Board, 0, 0, 4, Priority, Explanation),
+    Priority =:= 2,
+    once(sub_string(Explanation, _, _, _, "mais alto")).
+
+% ── Prioridade 3: opposite_clues_forced via explain_cell_deductive ──────────────
+% Left[0]=2, Right[0]=3, N=4 (soma=5=N+1). Prédio 4 fica na coluna 2 (Col=LClue-1=1).
+% Como edge_clue_forced só dispara com pista 1 ou N, e aqui Left=2, Right=3,
+% o predicado não entra por lá — cai em opposite_clues_forced com prioridade 3.
+test(explain_cell_uses_opposite_clues_priority_3) :-
+    blank_puzzle(4, Puzzle0),
+    set_test_clue(left,  0, 2, Puzzle0, Puzzle1),
+    set_test_clue(right, 0, 3, Puzzle1, Puzzle),
+    blank_board(4, Board),
+    explicador:explain_cell_deductive(Puzzle, Board, 0, 1, 4, Priority, Explanation),
+    Priority =:= 3,
+    once(sub_string(Explanation, _, _, _, "O prédio mais alto")).
 
 test(explain_cell_deductive_fails_without_direct_rule, [fail]) :-
     blank_puzzle(5, Puzzle),

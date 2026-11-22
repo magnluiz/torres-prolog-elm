@@ -127,4 +127,14 @@ test(unsolvable_board, true(Result == unsolvable)) :-
     example_puzzle(P),
     hint(P, [[4,0,0,0],[0,0,0,0],[0,0,0,0],[0,0,0,0]], Result).
 
+% Quando há candidatas de prioridades diferentes, hint deve escolher a de
+% menor prioridade. Aqui a linha 0 está quase completa ([1,2,3,0]): a célula
+% (0,3)=4 é justificada por single_in_row (prioridade 1). Todas as outras
+% células vazias têm prioridade ≥ 1 — portanto hint deve retornar (0,3).
+test(hint_prefers_lowest_priority_candidate,
+     true((Row == 0, Col == 3, Val == 4))) :-
+    example_puzzle(P),
+    Board = [[1,2,3,0],[0,0,0,0],[0,0,0,0],[0,0,0,0]],
+    hint(P, Board, [Row, Col, Val, _Explanation]).
+
 :- end_tests(hint).
