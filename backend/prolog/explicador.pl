@@ -82,7 +82,12 @@ explain_cell_deductive(Puzzle, Board, Row, Col, Value, Priority, Explanation) :-
 
     ->  Priority = 3
 
-        % Caso 10: É a única posição possível para esta altura na linha ou coluna (Prioridade 4)
+        % Caso 10: É forçada por par confinado / par nu (Prioridade 4)
+    ;   locked_pair_forced(Board, Row, Col, Value, Explanation)
+
+    ->  Priority = 4
+
+        % Caso 11: É a única posição possível para esta altura na linha ou coluna (Prioridade 4)
     ;   hidden_single(Board, Row, Col, Value, Explanation)
 
     ->  Priority = 4
@@ -589,16 +594,77 @@ edge_height_ceiling_forced(Puzzle, Board, Row, Col, Value, N, Explanation) :-
 %   Encontra todas as alturas entre 1 e MaxHeight que não estão presentes
 %   no restante da linha Row nem da coluna Col.
 edge_ceiling_candidates(Board, Row, Col, MaxHeight, Candidates) :-
+    cell_candidates(Board, Row, Col, MaxHeight, Candidates).
+
+%!  cell_candidates(+Board, +Row, +Col, +MaxV, -Candidates) is det.
+%   Encontra todas as alturas entre 1 e MaxV que não estão presentes
+%   no restante da linha Row nem da coluna Col.
+cell_candidates(Board, Row, Col, MaxV, Candidates) :-
     nth0(Row, Board, BRow),
     transpose(Board, Cols),
     nth0(Col, Cols, BCol),
     findall(
         V,
-        (   between(1, MaxHeight, V),
+        (   between(1, MaxV, V),
             \+ (nth0(C, BRow, V), C =\= Col),
             \+ (nth0(R, BCol, V), R =\= Row)
         ),
         Candidates
+    ).
+
+%!  locked_pair_forced(+Board, +Row, +Col, +Value, -Explanation) is semidet.
+%   Identifica quando duas outras casas da mesma linha (ou coluna) formam um par que
+%   possuem exatamente os mesmos 2 candidatos, eliminando esses dois valores da célula
+%   (Row, Col) e deixando Value como única opção restante.
+locked_pair_forced(Board, Row, Col, Value, Explanation) :-
+    length(Board, N),
+    Row1 is Row + 1,
+    Col1 is Col + 1,
+    MaxIndex is N - 1,
+    (   % 1. Par Nu na Linha (Row)
+        nth0(Row, Board, BRow),
+        nth0(Col, BRow, 0),
+        between(0, MaxIndex, C1),
+
+        C1 =\= Col,
+        nth0(C1, BRow, 0),
+        cell_candidates(Board, Row, C1, N, [P1, P2]),
+        C1Next is C1 + 1,
+        between(C1Next, MaxIndex, C2),
+        
+        C2 =\= Col,
+        nth0(C2, BRow, 0),
+        cell_candidates(Board, Row, C2, N, [P1, P2]),
+        cell_candidates(Board, Row, Col, N, RawCands),
+        (member(P1, RawCands) ; member(P2, RawCands)),
+        subtract(RawCands, [P1, P2], [Value])
+
+    ->  C1_1 is C1 + 1,
+        C2_1 is C2 + 1,
+        build_explanation(locked_pair_row, [Row1, C1_1, C2_1, P1, P2, Col1, Value], Explanation)
+
+        % 2. Par Nu na Coluna (Col)
+    ;   transpose(Board, Cols),
+        nth0(Col, Cols, BCol),
+        nth0(Row, BCol, 0),
+        between(0, MaxIndex, R1),
+
+        R1 =\= Row,
+        nth0(R1, BCol, 0),
+        cell_candidates(Board, R1, Col, N, [P1, P2]),
+        R1Next is R1 + 1,
+        between(R1Next, MaxIndex, R2),
+
+        R2 =\= Row,
+        nth0(R2, BCol, 0),
+        cell_candidates(Board, R2, Col, N, [P1, P2]),
+        cell_candidates(Board, Row, Col, N, RawCands),
+        (member(P1, RawCands) ; member(P2, RawCands)),
+        subtract(RawCands, [P1, P2], [Value])
+
+    ->  R1_1 is R1 + 1,
+        R2_1 is R2 + 1,
+        build_explanation(locked_pair_col, [Col1, R1_1, R2_1, P1, P2, Row1, Value], Explanation)
     ).
 
 %! build_explanation(+Chave, +Argumentos, -TextoExplicacao) is det.
@@ -707,5 +773,15 @@ message(
 message(
     edge_ceiling_bottom,
     'A pista da base exige ver ~w prédios na coluna ~w. O prédio da borda não pode ter altura maior que ~w (senão não haveria prédios suficientes mais altos para serem vistos). Resta apenas a altura ~w.'
+).
+
+message(
+    locked_pair_row,
+    'Na linha ~w, as casas nas colunas ~w e ~w formam um par exclusivo {~w, ~w}. Portanto, essas alturas não podem aparecer no restante da linha, restando para a coluna ~w obrigatoriamente a altura ~w.'
+).
+
+message(
+    locked_pair_col,
+    'Na coluna ~w, as casas nas linhas ~w e ~w formam um par exclusivo {~w, ~w}. Portanto, essas alturas não podem aparecer no restante da coluna, restando para a linha ~w obrigatoriamente a altura ~w.'
 ).
 % ==================================================================================================

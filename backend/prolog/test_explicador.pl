@@ -236,6 +236,41 @@ test(edge_ceiling_does_not_force_when_multiple_candidates_remain, [fail]) :-
     blank_board(4, Board), % Nenhum valor preenchido, tanto 1 quanto 2 continuam possíveis
     explicador:edge_height_ceiling_forced(Puzzle, Board, 0, 0, _Value, 4, _Explanation).
 
+test(locked_pair_row) :-
+    blank_board(4, Board0),
+    set_cell(Board0, 0, 0, 4, Board1),
+    set_cell(Board1, 1, 1, 3, Board2), % Col 1 já tem 3, então (0,1) só pode ser {1, 2}
+    set_cell(Board2, 1, 2, 3, Board),  % Col 2 já tem 3, então (0,2) só pode ser {1, 2}
+    explicador:locked_pair_forced(Board, 0, 3, 3, Explanation),
+    once(sub_string(Explanation, _, _, _, "Na linha 1")),
+    once(sub_string(Explanation, _, _, _, "par exclusivo {1, 2}")),
+    once(sub_string(Explanation, _, _, _, "restando para a coluna 4 obrigatoriamente a altura 3")).
+
+test(locked_pair_col) :-
+    blank_board(4, Board0),
+    set_cell(Board0, 0, 0, 4, Board1),
+    set_cell(Board1, 1, 1, 3, Board2), % Linha 1 já tem 3, então (1,0) só pode ser {1, 2}
+    set_cell(Board2, 2, 1, 3, Board),  % Linha 2 já tem 3, então (2,0) só pode ser {1, 2}
+    explicador:locked_pair_forced(Board, 3, 0, 3, Explanation),
+    once(sub_string(Explanation, _, _, _, "Na coluna 1")),
+    once(sub_string(Explanation, _, _, _, "par exclusivo {1, 2}")),
+    once(sub_string(Explanation, _, _, _, "restando para a linha 4 obrigatoriamente a altura 3")).
+
+test(explain_cell_uses_locked_pair_priority_4) :-
+    blank_puzzle(4, Puzzle),
+    blank_board(4, Board0),
+    set_cell(Board0, 0, 0, 4, Board1),
+    set_cell(Board1, 1, 1, 3, Board2),
+    set_cell(Board2, 1, 2, 3, Board),
+    explicador:explain_cell_deductive(Puzzle, Board, 0, 3, 3, Priority, Explanation),
+    Priority =:= 4,
+    once(sub_string(Explanation, _, _, _, "par exclusivo {1, 2}")).
+
+test(locked_pair_does_not_force_without_pair, [fail]) :-
+    blank_board(4, Board0),
+    set_cell(Board0, 0, 0, 4, Board),
+    explicador:locked_pair_forced(Board, 0, 3, _Value, _Explanation).
+
 test(explain_cell_deductive_fails_without_direct_rule, [fail]) :-
     blank_puzzle(5, Puzzle),
     blank_board(5, Board),
