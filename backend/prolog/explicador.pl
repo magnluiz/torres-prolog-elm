@@ -77,7 +77,12 @@ explain_cell_deductive(Puzzle, Board, Row, Col, Value, Priority, Explanation) :-
 
     ->  Priority = 3
 
-        % Caso 9: É a única posição possível para esta altura na linha ou coluna (Prioridade 4)
+        % Caso 9: É forçada pelo teto de altura da borda / visibilidade mínima (Prioridade 3)
+    ;   edge_height_ceiling_forced(Puzzle, Board, Row, Col, Value, N, Explanation)
+
+    ->  Priority = 3
+
+        % Caso 10: É a única posição possível para esta altura na linha ou coluna (Prioridade 4)
     ;   hidden_single(Board, Row, Col, Value, Explanation)
 
     ->  Priority = 4
@@ -533,6 +538,69 @@ barrier_candidates(Board, Row, Col, EdgeH, Candidates) :-
         ),
         Candidates).
 
+%!  edge_height_ceiling_forced(+Puzzle, +Board, +Row, +Col, +Value, +N, -Explanation) is semidet.
+%   Verifica se uma pista de borda C (com 1 < C < N) impõe um teto de altura máxima (N - C + 1)
+%   para a casa da borda e se, após eliminar os valores já usados na linha/coluna,
+%   resta apenas uma única altura viável.
+edge_height_ceiling_forced(Puzzle, Board, Row, Col, Value, N, Explanation) :-
+    Puzzle = [Top, Bottom, Left, Right, _, _],
+    Row1 is Row + 1,
+    Col1 is Col + 1,
+    LastIndex is N - 1,
+
+    (   % 1. Borda da Esquerda (Col = 0)
+        Col =:= 0,
+        nth0(Row, Left, C),
+        C > 1, C < N,
+        MaxHeight is N - C + 1,
+        edge_ceiling_candidates(Board, Row, Col, MaxHeight, [Value])
+
+    ->  build_explanation(edge_ceiling_left, [C, Row1, MaxHeight, Value], Explanation)
+
+        % 2. Borda da Direita (Col = LastIndex)
+    ;   Col =:= LastIndex,
+        nth0(Row, Right, C),
+        C > 1, C < N,
+        MaxHeight is N - C + 1,
+        edge_ceiling_candidates(Board, Row, Col, MaxHeight, [Value])
+
+    ->  build_explanation(edge_ceiling_right, [C, Row1, MaxHeight, Value], Explanation)
+
+        % 3. Borda do Topo (Row = 0)
+    ;   Row =:= 0,
+        nth0(Col, Top, C),
+        C > 1, C < N,
+        MaxHeight is N - C + 1,
+        edge_ceiling_candidates(Board, Row, Col, MaxHeight, [Value])
+
+    ->  build_explanation(edge_ceiling_top, [C, Col1, MaxHeight, Value], Explanation)
+
+        % 4. Borda da Base (Row = LastIndex)
+    ;   Row =:= LastIndex,
+        nth0(Col, Bottom, C),
+        C > 1, C < N,
+        MaxHeight is N - C + 1,
+        edge_ceiling_candidates(Board, Row, Col, MaxHeight, [Value])
+        
+    ->  build_explanation(edge_ceiling_bottom, [C, Col1, MaxHeight, Value], Explanation)
+    ).
+
+%!  edge_ceiling_candidates(+Board, +Row, +Col, +MaxHeight, -Candidates) is det.
+%   Encontra todas as alturas entre 1 e MaxHeight que não estão presentes
+%   no restante da linha Row nem da coluna Col.
+edge_ceiling_candidates(Board, Row, Col, MaxHeight, Candidates) :-
+    nth0(Row, Board, BRow),
+    transpose(Board, Cols),
+    nth0(Col, Cols, BCol),
+    findall(
+        V,
+        (   between(1, MaxHeight, V),
+            \+ (nth0(C, BRow, V), C =\= Col),
+            \+ (nth0(R, BCol, V), R =\= Row)
+        ),
+        Candidates
+    ).
+
 %! build_explanation(+Chave, +Argumentos, -TextoExplicacao) is det.
 build_explanation(Chave, Argumentos, TextoExplicacao) :-
     message(Chave, Template),
@@ -619,5 +687,25 @@ message(
 message(
     visibility_barrier_bottom,
     'A pista da base exige ver apenas 2 prédios na coluna ~w. O prédio da borda tem altura ~w e o prédio mais alto (~w) está na linha ~w. Portanto, a casa na linha ~w precisa ficar escondida atrás dele (altura menor que ~w), restando apenas a altura ~w.'
+).
+
+message(
+    edge_ceiling_left,
+    'A pista da esquerda exige ver ~w prédios na linha ~w. O primeiro prédio não pode ter altura maior que ~w (senão não haveria prédios suficientes mais altos para serem vistos). Resta apenas a altura ~w.'
+).
+
+message(
+    edge_ceiling_right,
+    'A pista da direita exige ver ~w prédios na linha ~w. O prédio da borda não pode ter altura maior que ~w (senão não haveria prédios suficientes mais altos para serem vistos). Resta apenas a altura ~w.'
+).
+
+message(
+    edge_ceiling_top,
+    'A pista do topo exige ver ~w prédios na coluna ~w. O primeiro prédio não pode ter altura maior que ~w (senão não haveria prédios suficientes mais altos para serem vistos). Resta apenas a altura ~w.'
+).
+
+message(
+    edge_ceiling_bottom,
+    'A pista da base exige ver ~w prédios na coluna ~w. O prédio da borda não pode ter altura maior que ~w (senão não haveria prédios suficientes mais altos para serem vistos). Resta apenas a altura ~w.'
 ).
 % ==================================================================================================

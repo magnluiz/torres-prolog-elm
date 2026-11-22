@@ -181,6 +181,61 @@ test(visibility_barrier_does_not_force_when_two_candidates_remain, [fail]) :-
     set_cell(Board1, 0, 3, 4, Board),
     explicador:visibility_barrier_forced(Puzzle, Board, 0, 1, _Value, 4, _Explanation).
 
+test(edge_ceiling_left) :-
+    blank_puzzle(4, Puzzle0),
+    set_test_clue(left, 0, 3, Puzzle0, Puzzle), % C = 3, MaxHeight = 4 - 3 + 1 = 2
+    blank_board(4, Board0),
+    set_cell(Board0, 2, 0, 2, Board), % Coluna 0 já tem 2, então (0,0) só pode ser 1
+    explicador:edge_height_ceiling_forced(Puzzle, Board, 0, 0, 1, 4, Explanation),
+    once(sub_string(Explanation, _, _, _, "pista da esquerda")),
+    once(sub_string(Explanation, _, _, _, "não pode ter altura maior que 2")),
+    once(sub_string(Explanation, _, _, _, "Resta apenas a altura 1")).
+
+test(edge_ceiling_right) :-
+    blank_puzzle(4, Puzzle0),
+    set_test_clue(right, 0, 3, Puzzle0, Puzzle), % C = 3, MaxHeight = 2
+    blank_board(4, Board0),
+    set_cell(Board0, 2, 3, 2, Board), % Coluna 3 já tem 2
+    explicador:edge_height_ceiling_forced(Puzzle, Board, 0, 3, 1, 4, Explanation),
+    once(sub_string(Explanation, _, _, _, "pista da direita")),
+    once(sub_string(Explanation, _, _, _, "não pode ter altura maior que 2")),
+    once(sub_string(Explanation, _, _, _, "Resta apenas a altura 1")).
+
+test(edge_ceiling_top) :-
+    blank_puzzle(4, Puzzle0),
+    set_test_clue(top, 0, 3, Puzzle0, Puzzle), % C = 3, MaxHeight = 2
+    blank_board(4, Board0),
+    set_cell(Board0, 0, 2, 2, Board), % Linha 0 já tem 2
+    explicador:edge_height_ceiling_forced(Puzzle, Board, 0, 0, 1, 4, Explanation),
+    once(sub_string(Explanation, _, _, _, "pista do topo")),
+    once(sub_string(Explanation, _, _, _, "não pode ter altura maior que 2")),
+    once(sub_string(Explanation, _, _, _, "Resta apenas a altura 1")).
+
+test(edge_ceiling_bottom) :-
+    blank_puzzle(4, Puzzle0),
+    set_test_clue(bottom, 0, 3, Puzzle0, Puzzle), % C = 3, MaxHeight = 2
+    blank_board(4, Board0),
+    set_cell(Board0, 3, 2, 2, Board), % Linha 3 já tem 2
+    explicador:edge_height_ceiling_forced(Puzzle, Board, 3, 0, 1, 4, Explanation),
+    once(sub_string(Explanation, _, _, _, "pista da base")),
+    once(sub_string(Explanation, _, _, _, "não pode ter altura maior que 2")),
+    once(sub_string(Explanation, _, _, _, "Resta apenas a altura 1")).
+
+test(explain_cell_uses_edge_ceiling_priority_3) :-
+    blank_puzzle(4, Puzzle0),
+    set_test_clue(left, 0, 3, Puzzle0, Puzzle),
+    blank_board(4, Board0),
+    set_cell(Board0, 2, 0, 2, Board),
+    explicador:explain_cell_deductive(Puzzle, Board, 0, 0, 1, Priority, Explanation),
+    Priority =:= 3,
+    once(sub_string(Explanation, _, _, _, "não pode ter altura maior que 2")).
+
+test(edge_ceiling_does_not_force_when_multiple_candidates_remain, [fail]) :-
+    blank_puzzle(4, Puzzle0),
+    set_test_clue(left, 0, 3, Puzzle0, Puzzle),
+    blank_board(4, Board), % Nenhum valor preenchido, tanto 1 quanto 2 continuam possíveis
+    explicador:edge_height_ceiling_forced(Puzzle, Board, 0, 0, _Value, 4, _Explanation).
+
 test(explain_cell_deductive_fails_without_direct_rule, [fail]) :-
     blank_puzzle(5, Puzzle),
     blank_board(5, Board),
