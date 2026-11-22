@@ -67,12 +67,17 @@ explain_cell_deductive(Puzzle, Board, Row, Col, Value, Priority, Explanation) :-
 
     ->  Priority = 3
 
-        % Caso 7: É forçada pela ausência de ponto Kropki (Prioridade 3)
+        % Caso 7: É forçada por barreira de visibilidade / prédio escondedor (Prioridade 3)
+    ;   visibility_barrier_forced(Puzzle, Board, Row, Col, Value, N, Explanation)
+
+    ->  Priority = 3
+
+        % Caso 8: É forçada pela ausência de ponto Kropki (Prioridade 3)
     ;   negative_kropki_forced(Puzzle, Board, Row, Col, Value, Explanation)
 
     ->  Priority = 3
 
-        % Caso 8: É a única posição possível para esta altura na linha ou coluna (Prioridade 4)
+        % Caso 9: É a única posição possível para esta altura na linha ou coluna (Prioridade 4)
     ;   hidden_single(Board, Row, Col, Value, Explanation)
 
     ->  Priority = 4
@@ -452,6 +457,82 @@ opposite_clues_forced(Puzzle, Row, Col, Value, N, Explanation) :-
         build_explanation(opposite_clues_col, [N, TClue, BClue, Col1, Before, After, Row1], Explanation)
     ).
 
+%!  visibility_barrier_forced(+Puzzle, +Board, +Row, +Col, +Value, +N, -Explanation) is semidet.
+%   Identifica quando uma pista de borda 2 combinada com a posição do prédio mais alto (N)
+%   obriga que todas as casas intermediárias fiquem escondidas atrás do prédio da borda
+%   (altura estritamente menor que EdgeH), restando apenas uma altura possível para a casa.
+visibility_barrier_forced(Puzzle, Board, Row, Col, Value, N, Explanation) :-
+    Puzzle = [Top, Bottom, Left, Right, _, _],
+    Row1 is Row + 1,
+    Col1 is Col + 1,
+    (   % 1. Pista da Esquerda (Left) = 2
+        nth0(Row, Left, 2),
+        nth0(Row, Board, BRow),
+        nth0(0, BRow, EdgeH),
+        EdgeH > 1, EdgeH < N,
+        nth0(PosN, BRow, N),
+        PosN > 1,
+        Col > 0, Col < PosN,
+        barrier_candidates(Board, Row, Col, EdgeH, [Value])
+    ->  PosN1 is PosN + 1,
+        build_explanation(visibility_barrier_left, [Row1, EdgeH, N, PosN1, Col1, EdgeH, Value], Explanation)
+
+        % 2. Pista da Direita (Right) = 2
+    ;   nth0(Row, Right, 2),
+        nth0(Row, Board, BRow),
+        LastCol is N - 1,
+        nth0(LastCol, BRow, EdgeH),
+        EdgeH > 1, EdgeH < N,
+        nth0(PosN, BRow, N),
+        PosN < LastCol - 1,
+        Col > PosN, Col < LastCol,
+        barrier_candidates(Board, Row, Col, EdgeH, [Value])
+    ->  PosN1 is PosN + 1,
+        build_explanation(visibility_barrier_right, [Row1, EdgeH, N, PosN1, Col1, EdgeH, Value], Explanation)
+
+        % 3. Pista do Topo (Top) = 2
+    ;   nth0(Col, Top, 2),
+        transpose(Board, Cols),
+        nth0(Col, Cols, BCol),
+        nth0(0, BCol, EdgeH),
+        EdgeH > 1, EdgeH < N,
+        nth0(PosN, BCol, N),
+        PosN > 1,
+        Row > 0, Row < PosN,
+        barrier_candidates(Board, Row, Col, EdgeH, [Value])
+    ->  PosN1 is PosN + 1,
+        build_explanation(visibility_barrier_top, [Col1, EdgeH, N, PosN1, Row1, EdgeH, Value], Explanation)
+
+        % 4. Pista da Base (Bottom) = 2
+    ;   nth0(Col, Bottom, 2),
+        transpose(Board, Cols),
+        nth0(Col, Cols, BCol),
+        LastRow is N - 1,
+        nth0(LastRow, BCol, EdgeH),
+        EdgeH > 1, EdgeH < N,
+        nth0(PosN, BCol, N),
+        PosN < LastRow - 1,
+        Row > PosN, Row < LastRow,
+        barrier_candidates(Board, Row, Col, EdgeH, [Value])
+    ->  PosN1 is PosN + 1,
+        build_explanation(visibility_barrier_bottom, [Col1, EdgeH, N, PosN1, Row1, EdgeH, Value], Explanation)
+    ).
+
+%!  barrier_candidates(+Board, +Row, +Col, +EdgeH, -Candidates) is det.
+%   Encontra todos os valores menores que EdgeH que ainda não estão presentes
+%   na linha Row nem na coluna Col.
+barrier_candidates(Board, Row, Col, EdgeH, Candidates) :-
+    MaxV is EdgeH - 1,
+    nth0(Row, Board, BRow),
+    transpose(Board, Cols),
+    nth0(Col, Cols, BCol),
+    findall(V,
+        (   between(1, MaxV, V),
+            \+ (nth0(C, BRow, V), C =\= Col),
+            \+ (nth0(R, BCol, V), R =\= Row)
+        ),
+        Candidates).
+
 %! build_explanation(+Chave, +Argumentos, -TextoExplicacao) is det.
 build_explanation(Chave, Argumentos, TextoExplicacao) :-
     message(Chave, Template),
@@ -518,5 +599,25 @@ message(
 message(
     negative_kropki,
     'O ponto com (~w, ~w) [altura ~w] permite ~w ou ~w. Porém, a ausência de ponto com (~w, ~w) [altura ~w] proíbe o ~w (pois seriam consecutivos). Resta apenas o ~w.'
+).
+
+message(
+    visibility_barrier_left,
+    'A pista da esquerda exige ver apenas 2 prédios na linha ~w. O primeiro prédio tem altura ~w e o prédio mais alto (~w) está na coluna ~w. Portanto, a casa na coluna ~w precisa ficar escondida atrás do primeiro prédio (altura menor que ~w), restando apenas a altura ~w.'
+).
+
+message(
+    visibility_barrier_right,
+    'A pista da direita exige ver apenas 2 prédios na linha ~w. O prédio da borda tem altura ~w e o prédio mais alto (~w) está na coluna ~w. Portanto, a casa na coluna ~w precisa ficar escondida atrás dele (altura menor que ~w), restando apenas a altura ~w.'
+).
+
+message(
+    visibility_barrier_top,
+    'A pista do topo exige ver apenas 2 prédios na coluna ~w. O primeiro prédio tem altura ~w e o prédio mais alto (~w) está na linha ~w. Portanto, a casa na linha ~w precisa ficar escondida atrás do primeiro prédio (altura menor que ~w), restando apenas a altura ~w.'
+).
+
+message(
+    visibility_barrier_bottom,
+    'A pista da base exige ver apenas 2 prédios na coluna ~w. O prédio da borda tem altura ~w e o prédio mais alto (~w) está na linha ~w. Portanto, a casa na linha ~w precisa ficar escondida atrás dele (altura menor que ~w), restando apenas a altura ~w.'
 ).
 % ==================================================================================================

@@ -119,6 +119,68 @@ test(explain_cell_uses_negative_kropki_deduction) :-
     Priority =:= 3,
     once(sub_string(Explanation, _, _, _, "ausência de ponto")).
 
+test(visibility_barrier_left) :-
+    blank_puzzle(4, Puzzle0),
+    set_test_clue(left, 0, 2, Puzzle0, Puzzle),
+    blank_board(4, Board0),
+    set_cell(Board0, 0, 0, 2, Board1),
+    set_cell(Board1, 0, 2, 4, Board),
+    explicador:visibility_barrier_forced(Puzzle, Board, 0, 1, 1, 4, Explanation),
+    once(sub_string(Explanation, _, _, _, "pista da esquerda")),
+    once(sub_string(Explanation, _, _, _, "escondida atrás")),
+    once(sub_string(Explanation, _, _, _, "restando apenas a altura 1")).
+
+test(visibility_barrier_right) :-
+    blank_puzzle(4, Puzzle0),
+    set_test_clue(right, 0, 2, Puzzle0, Puzzle),
+    blank_board(4, Board0),
+    set_cell(Board0, 0, 3, 2, Board1),
+    set_cell(Board1, 0, 1, 4, Board),
+    explicador:visibility_barrier_forced(Puzzle, Board, 0, 2, 1, 4, Explanation),
+    once(sub_string(Explanation, _, _, _, "pista da direita")),
+    once(sub_string(Explanation, _, _, _, "escondida atrás")),
+    once(sub_string(Explanation, _, _, _, "restando apenas a altura 1")).
+
+test(visibility_barrier_top) :-
+    blank_puzzle(4, Puzzle0),
+    set_test_clue(top, 0, 2, Puzzle0, Puzzle),
+    blank_board(4, Board0),
+    set_cell(Board0, 0, 0, 2, Board1),
+    set_cell(Board1, 2, 0, 4, Board),
+    explicador:visibility_barrier_forced(Puzzle, Board, 1, 0, 1, 4, Explanation),
+    once(sub_string(Explanation, _, _, _, "pista do topo")),
+    once(sub_string(Explanation, _, _, _, "escondida atrás")),
+    once(sub_string(Explanation, _, _, _, "restando apenas a altura 1")).
+
+test(visibility_barrier_bottom) :-
+    blank_puzzle(4, Puzzle0),
+    set_test_clue(bottom, 0, 2, Puzzle0, Puzzle),
+    blank_board(4, Board0),
+    set_cell(Board0, 3, 0, 2, Board1),
+    set_cell(Board1, 1, 0, 4, Board),
+    explicador:visibility_barrier_forced(Puzzle, Board, 2, 0, 1, 4, Explanation),
+    once(sub_string(Explanation, _, _, _, "pista da base")),
+    once(sub_string(Explanation, _, _, _, "escondida atrás")),
+    once(sub_string(Explanation, _, _, _, "restando apenas a altura 1")).
+
+test(explain_cell_uses_visibility_barrier_priority_3) :-
+    blank_puzzle(4, Puzzle0),
+    set_test_clue(left, 0, 2, Puzzle0, Puzzle),
+    blank_board(4, Board0),
+    set_cell(Board0, 0, 0, 2, Board1),
+    set_cell(Board1, 0, 2, 4, Board),
+    explicador:explain_cell_deductive(Puzzle, Board, 0, 1, 1, Priority, Explanation),
+    Priority =:= 3,
+    once(sub_string(Explanation, _, _, _, "escondida atrás")).
+
+test(visibility_barrier_does_not_force_when_two_candidates_remain, [fail]) :-
+    blank_puzzle(4, Puzzle0),
+    set_test_clue(left, 0, 2, Puzzle0, Puzzle),
+    blank_board(4, Board0),
+    set_cell(Board0, 0, 0, 3, Board1), % EdgeH = 3, so both 1 and 2 can be behind 3
+    set_cell(Board1, 0, 3, 4, Board),
+    explicador:visibility_barrier_forced(Puzzle, Board, 0, 1, _Value, 4, _Explanation).
+
 test(explain_cell_deductive_fails_without_direct_rule, [fail]) :-
     blank_puzzle(5, Puzzle),
     blank_board(5, Board),
@@ -253,6 +315,9 @@ edge_maximum_case(right, Puzzle, 1, 2, 3) :- set_test_clue(right, 1, 5, Puzzle).
 
 set_test_clue(Side, Index, Value, Puzzle) :-
     blank_puzzle(5, Puzzle0),
+    set_test_clue(Side, Index, Value, Puzzle0, Puzzle).
+
+set_test_clue(Side, Index, Value, Puzzle0, Puzzle) :-
     Puzzle0 = [Top0, Bottom0, Left0, Right0, HDots, VDots],
     (   Side = top
     ->  replace_at(Index, Top0, Value, Top),
