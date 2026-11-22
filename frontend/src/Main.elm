@@ -167,12 +167,16 @@ update msg model =
                     else
                         game
                 )
-                model
+                (dismissHint model)
             , Cmd.none
             )
 
         ErasePressed ->
-            ( updateGame (changeSelected (\position -> Towers.setCell position Empty)) model
+            ( updateGame 
+                (changeSelected 
+                    (\position -> 
+                        Towers.setCell position Empty))
+                (dismissHint model)
             , Cmd.none
             )
 
@@ -227,6 +231,19 @@ update msg model =
 
         ErrorDismissed ->
             ( { model | status = Idle }, Cmd.none )
+
+
+{-| Limpa a mensagem de dica se ela estiver visível, voltando o estado
+para `Idle`. Usada quando o jogador volta a interagir com o tabuleiro.
+-}
+dismissHint : Model -> Model
+dismissHint model =
+    case model.status of
+        HintGiven _ ->
+            { model | status = Idle }
+
+        _ ->
+            model
 
 
 {-| Aplica uma alteração à partida, se houver uma. `Maybe.map` faz
@@ -446,36 +463,46 @@ viewDifficulty model =
 
 viewMessages : Model -> Html Msg
 viewMessages model =
-    case model.status of
-        Failed error ->
-            div [ class "message message--error" ]
-                [ span [] [ text error ]
-                , button [ class "message-close", onClick ErrorDismissed ] [ text "✕" ]
-                ]
-
-        Thinking ->
-            div [ class "message message--loading" ]
-                [ span [ class "spinner" ] []
-                , span [] [ text "O Prolog está pensando..." ]
-                ]
-
-        HintGiven explanation -> 
-            div [ class "message message--info" ]
-                [ span [] [ text ("Dica: " ++ explanation) ]
-                , button [ class "message-close", onClick ErrorDismissed ] [ text "x" ]
-                ]
-
-        Idle ->
+    let
+        isGameComplete =
             case model.game of
                 Just game ->
-                    if Towers.isComplete game.puzzle game.board then
-                        div [ class "message message--success" ] [ text (completionMessage game.board game.puzzle) ]
-
-                    else
-                        text ""
+                    Towers.isComplete game.puzzle game.board
 
                 Nothing ->
-                    text ""
+                    False
+    in
+    if isGameComplete then
+        case model.game of
+            Just game ->
+                div [ class "message message--success" ]
+                    [ text (completionMessage game.board game.puzzle) ]
+
+            Nothing ->
+                text ""
+
+    else
+        case model.status of
+            Failed error ->
+                div [ class "message message--error" ]
+                    [ span [] [ text error ]
+                    , button [ class "message-close", onClick ErrorDismissed ] [ text "✕" ]
+                    ]
+
+            Thinking ->
+                div [ class "message message--loading" ]
+                    [ span [ class "spinner" ] []
+                    , span [] [ text "O Prolog está pensando..." ]
+                    ]
+
+            HintGiven explanation ->
+                div [ class "message message--info" ]
+                    [ span [] [ text ("Dica: " ++ explanation) ]
+                    , button [ class "message-close", onClick ErrorDismissed ] [ text "x" ]
+                    ]
+
+            Idle ->
+                text ""
 
 
 completionMessage : Board -> Puzzle -> String
