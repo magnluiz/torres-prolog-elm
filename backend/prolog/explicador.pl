@@ -2,14 +2,28 @@
     Analisa as restrições e gera justificativas em linguagem natural.
 */
 
-:- module(explicador, [explain_cell/6]).
+:- module(explicador, [explain_cell/6, explain_cell_deductive/6]).
 :- use_module(library(clpfd)).
 :- use_module(library(lists)).
 
-
-%! explain_cell(+Puzzle, +Board, +Row, +Col, +Value, -Explanation) is det.
-%  Examina por que a a altura Value é a escolha correta para a célula (Row, Col).
+%!  explain_cell(+Puzzle, +Board, +Row, +Col, +Value, -Explanation) is det.
+%  Examina a célula (Row, Col) do tabuleiro Board e explica por que ela deve receber o valor Value.
 explain_cell(Puzzle, Board, Row, Col, Value, Explanation) :-
+    (   explain_cell_deductive(Puzzle, Board, Row, Col, Value, Explanation)
+
+    ->  true
+
+        % Caso contrário, gera uma explicação genérica
+    ;   Row1 is Row + 1,
+        Col1 is Col + 1,
+        build_explanation(general_case, [Value, Row1, Col1], Explanation)
+    ),
+    !.
+
+
+%! explain_cell_deductive(+Puzzle, +Board, +Row, +Col, +Value, -Explanation) is semidet.
+%  Tem sucesso apenas se houver uma dedução pedagógica direta (casos 1 a 4).
+explain_cell_deductive(Puzzle, Board, Row, Col, Value, Explanation) :-
     length(Board, N),
     Row1 is Row + 1,
     Col1 is Col + 1,
@@ -33,16 +47,14 @@ explain_cell(Puzzle, Board, Row, Col, Value, Explanation) :-
 
         % Caso 3: É forçada por um ponto Kropki com vizinho conhecido
     ;   kropki_dot_forced(Puzzle, Board, Row, Col, Value, Explanation)
+
     ->  true
 
         % Caso 4: É forçada por uma pista de borda
     ;   edge_clue_forced(Puzzle, Row, Col, Value, N, Explanation)
-    ->  true
 
-        % 5. Dedução combinada de restrições (CLP/FD)
-    ;   build_explanation(general_case, [Value, Row1, Col1], Explanation)
-    ),
-    !.
+    ->  true
+    ).
 
 %!  kropki_dot_forced(+Puzzle, +Board, +Row, +Col, +Value, -Explanation) is semidet.
 %   Verifica se a célula possui um vizinho com ponto Kropki que obriga a altura Value.

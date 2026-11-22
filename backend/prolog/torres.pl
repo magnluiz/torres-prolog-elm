@@ -350,11 +350,35 @@ hint(Puzzle, Board, Result) :-
     ->  empty_positions(Board, Empty),
         (   Empty == []
         ->  Result = complete
-        ;   random_member(Row-Col, Empty),
-            nth0(Row, Solution, SolutionRow),
-            nth0(Col, SolutionRow, Value),
-            explain_cell(Puzzle, Board, Row, Col, Value, Explanation),
-            Result = [Row, Col, Value, Explanation]
+
+        ;   % Caso 1: Procura por deduções diretas (casos 1 a 4 do explicador)
+           findall(
+                candidate(Row, Col, Value, Explanation),
+                (
+                    member(Row-Col, Empty),
+                    nth0(Row, Solution, SolutionRow),
+                    nth0(Col, SolutionRow, Value),
+                    explain_cell_deductive(Puzzle, Board, Row, Col, Value, Explanation)
+                ),
+                DeductiveCandidates
+            ),
+            
+            % Caso 2: Se não houver deduções diretas, recorre ao caso geral do explicador
+            (   DeductiveCandidates \= []
+
+                ->  random_member(
+                        candidate(Row, Col, Value, Explanation), 
+                        DeductiveCandidates
+                    ),
+                    Result = [Row, Col, Value, Explanation]
+                
+                ;
+                    random_member(Row-Col, Empty),
+                    nth0(Row, Solution, SolutionRow),
+                    nth0(Col, SolutionRow, Value),
+                    explain_cell(Puzzle, Board, Row, Col, Value, Explanation),
+                    Result = [Row, Col, Value, Explanation]
+            )
         )
     ;   Result = unsolvable
     ).
