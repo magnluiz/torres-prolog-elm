@@ -59,6 +59,11 @@ explain_cell_deductive(Puzzle, Board, Row, Col, Value, Explanation) :-
     ;   edge_clue_forced(Puzzle, Row, Col, Value, N, Explanation)
 
     ->  true
+
+        % Caso 6: É forçada pela soma de pistas opostas (A + B = N + 1)
+    ;   opposite_clues_forced(Puzzle, Row, Col, Value, N, Explanation)
+
+    ->  true
     ).
 
 %!  double_dot_forced(+Puzzle, +Board, +Row, +Col, +Value, -Explanation) is semidet.
@@ -291,6 +296,39 @@ edge_clue_forced(Puzzle, Row, Col, Value, N, Explanation) :-
         )
     ).
 
+%!  opposite_clues_forced(+Puzzle, +Row, +Col, +Value, +N, -Explanation) is semidet.
+%   Quando a soma das pistas opostas é N + 1 (A + B = N + 1), a posição do prédio
+%   mais alto (N) fica fixada porque ele precisa de exatamente A-1 prédios de um lado
+%   e B-1 prédios do outro lado para atender à visibilidade.
+opposite_clues_forced(Puzzle, Row, Col, Value, N, Explanation) :-
+    Value =:= N,
+    Puzzle = [Top, Bottom, Left, Right, _, _],
+    SumTarget is N + 1,
+    Row1 is Row + 1,
+    Col1 is Col + 1,
+
+    (   % Caso Linha: Left + Right =:= N + 1
+        nth0(Row, Left, LClue),
+        nth0(Row, Right, RClue),
+        LClue > 1, RClue > 1,
+        LClue + RClue =:= SumTarget,
+        Col =:= LClue - 1
+
+    ->  Before is LClue - 1,
+        After is RClue - 1,
+        build_explanation(opposite_clues_row, [N, LClue, RClue, Row1, Before, After, Col1], Explanation)
+
+        % Caso Coluna: Top + Bottom =:= N + 1
+    ;   nth0(Col, Top, TClue),
+        nth0(Col, Bottom, BClue),
+        TClue > 1, BClue > 1,
+        TClue + BClue =:= SumTarget,
+        Row =:= TClue - 1
+        
+    ->  Before is TClue - 1,
+        After is BClue - 1,
+        build_explanation(opposite_clues_col, [N, TClue, BClue, Col1, Before, After, Row1], Explanation)
+    ).
 
 %! build_explanation(+Chave, +Argumentos, -TextoExplicacao) is det.
 build_explanation(Chave, Argumentos, TextoExplicacao) :-
@@ -333,5 +371,15 @@ message(
 message(
     double_dot,
     'Os pontos Kropki ligam esta posição às casas (~w, ~w) [altura ~w] e (~w, ~w) [altura ~w]. A única altura com diferença de 1 para ambas é a ~w.'
+).
+
+message(
+    opposite_clues_row,
+    'O prédio mais alto (~w) esconde os demais atrás dele. Para conseguir ver ~w prédios da esquerda e ~w da direita na linha ~w, ele precisa ter ~w prédios antes e ~w depois, ficando obrigatoriamente na coluna ~w.'
+).
+
+message(
+    opposite_clues_col,
+    'O prédio mais alto (~w) esconde os demais atrás dele. Para conseguir ver ~w prédios de cima e ~w de baixo na coluna ~w, ele precisa ter ~w prédios antes e ~w depois, ficando obrigatoriamente na linha ~w.'
 ).
 % ==================================================================================================
