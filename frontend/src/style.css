@@ -455,6 +455,16 @@
   .panel-label {
     @apply text-xs font-semibold tracking-widest uppercase opacity-60;
   }
+  .game-stats {
+    @apply grid gap-1 text-sm;
+  }
+  .game-stat {
+    @apply flex justify-between;
+  }
+  .game-stat span:last-child {
+    @apply font-semibold;
+    font-variant-numeric: tabular-nums;
+  }
 
   /* Área de mensagens com altura fixa, para o layout não "pular". */
   .message-area {
