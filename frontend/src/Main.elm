@@ -330,7 +330,10 @@ finishIfComplete model =
                                 { game | finished = True }
 
                             finishedModel =
-                                { model | game = Just finishedGame }
+                                { model
+                                    | game = Just finishedGame
+                                    , status = Idle
+                                }
 
                             updatedRecords =
                                 Statistics.recordIfEligible
