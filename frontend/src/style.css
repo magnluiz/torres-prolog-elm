@@ -815,6 +815,9 @@
   .action-button--hint    { @apply btn-secondary; }
   .action-button--solve   { @apply btn-accent; }
   .action-button--reset   { @apply btn-ghost; }
+  .history-controls { @apply grid grid-cols-2 gap-2; }
+  .history-button { @apply btn btn-sm btn-outline; gap: 0.5rem; }
+  .history-button:disabled { opacity: 0.4; }
 
   /* ---------- Como jogar ---------- */
 
