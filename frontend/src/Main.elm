@@ -12,18 +12,18 @@ port module Main exposing (main)
 import Api exposing (Difficulty(..))
 import Browser
 import Browser.Events
-import Html exposing (Html, aside, button, details, div, footer, h1, header, input, label, li, main_, p, span, summary, text, ul)
+import Html exposing (Html, aside, button, details, div, footer, h1, h2, header, input, label, li, main_, p, span, summary, text, ul)
 import Html.Attributes exposing (attribute, checked, class, classList, disabled, type_, value)
 import Html.Events exposing (onCheck, onClick)
 import Json.Decode as Decode exposing (Decoder)
 import Json.Encode as Encode
 import Set exposing (Set)
 import Statistics
+import Svg exposing (path, svg)
+import Svg.Attributes as SvgAttr
 import Task
 import Time
 import Towers exposing (Board, Cell(..), Clue(..), ClueStatus(..), Position, Puzzle, Side(..))
-import Svg exposing (path, svg)
-import Svg.Attributes as SvgAttr
 
 
 port saveBestTimes : Encode.Value -> Cmd msg
@@ -62,6 +62,7 @@ type alias Model =
     , status : Status
     , darkTheme : Bool
     , bestTimes : Statistics.BestTimes
+    , showVictoryModal : Bool
     }
 
 
@@ -81,6 +82,7 @@ type alias Game =
     , hintsUsed : Int
     , solverUsed : Bool
     , finished : Bool
+    , newRecord : Bool
     }
 
 
@@ -121,6 +123,7 @@ init flags =
       , status = Thinking
       , darkTheme = flags.darkTheme
       , bestTimes = flags.bestTimes
+      , showVictoryModal = False
       }
     , Api.generate Medium GotPuzzle
     )
@@ -149,22 +152,21 @@ type Msg
     | ErrorDismissed
     | ClockStarted Time.Posix
     | Tick Time.Posix
+    | VictoryModalDismissed
 
 
 update : Msg -> Model -> ( Model, Cmd Msg )
 update msg model =
     case msg of
         NewGame difficulty ->
-            ( { model | difficulty = difficulty, status = Thinking }
+            ( { model | difficulty = difficulty, status = Thinking, showVictoryModal = False }
             , Api.generate difficulty GotPuzzle
             )
 
         GotPuzzle (Ok puzzle) ->
             ( { model
                 | game =
-                   
                     Just
-                       
                         { puzzle = puzzle
                         , board = Towers.emptyBoard puzzle
                         , history = { past = [], future = [] }
@@ -175,8 +177,10 @@ update msg model =
                         , hintsUsed = 0
                         , solverUsed = False
                         , finished = False
+                        , newRecord = False
                         }
                 , status = Idle
+                , showVictoryModal = False
               }
             , Task.perform ClockStarted Time.now
             )
@@ -225,7 +229,7 @@ update msg model =
             else
                 finishIfComplete
                     (updateGame
-                        (changeSelected 
+                        (changeSelected
                             (\position -> Towers.setCell position Empty)
                         )
                         (dismissHint model)
@@ -314,6 +318,9 @@ update msg model =
         ErrorDismissed ->
             ( { model | status = Idle }, Cmd.none )
 
+        VictoryModalDismissed ->
+            ( { model | showVictoryModal = False }, Cmd.none )
+
         ClockStarted startedAt ->
             finishIfComplete
                 (updateGame (\game -> { game | startedAt = Just startedAt }) model)
@@ -361,15 +368,6 @@ finishIfComplete model =
 
                     else
                         let
-                            finishedGame =
-                                { game | finished = True }
-
-                            finishedModel =
-                                { model
-                                    | game = Just finishedGame
-                                    , status = Idle
-                                }
-
                             updatedRecords =
                                 Statistics.recordIfEligible
                                     game.difficulty
@@ -377,6 +375,20 @@ finishIfComplete model =
                                     game.hintsUsed
                                     game.solverUsed
                                     model.bestTimes
+
+                            newRecord =
+                                updatedRecords /= model.bestTimes
+
+                            finishedGame =
+                                { game | finished = True, newRecord = newRecord }
+
+                            finishedModel =
+                                { model
+                                    | game = Just finishedGame
+                                    , status = Idle
+                                    , showVictoryModal = True
+                                }
+
                         in
                         if updatedRecords == model.bestTimes then
                             ( finishedModel, Cmd.none )
@@ -470,7 +482,6 @@ undoGame game =
 
         [] ->
             game
-
 
 
 {-| Refaz a última jogada desfeita, se houver. O tabuleiro atual vai para a pilha de "desfazer".
@@ -585,6 +596,7 @@ keyDecoder =
         (Decode.field "shiftKey" Decode.bool)
         |> Decode.andThen identity
 
+
 keyToMsgWithModifiers : String -> Bool -> Bool -> Bool -> Decoder Msg
 keyToMsgWithModifiers key ctrlKey metaKey shiftKey =
     if ctrlKey || metaKey then
@@ -632,6 +644,9 @@ keyToMsg key =
         "N" ->
             Decode.succeed ModeToggled
 
+        "Escape" ->
+            Decode.succeed VictoryModalDismissed
+
         _ ->
             case String.toInt key of
                 Just 0 ->
@@ -670,16 +685,10 @@ view model =
             ]
         , main_ [ class "app-main" ]
             [ div [ class "app-container game" ]
-                [ case model.game of
-                    Just game ->
-                        viewTowers game
-
-                    Nothing ->
-                        div [ class "towers towers--waiting" ] []
+                [ viewBoardColumn model
                 , aside [ class "side-panel" ]
                     [ span [ class "panel-label" ] [ text "Novo jogo" ]
                     , viewDifficulty model
-                    , div [ class "message-area" ] [ viewMessages model ]
                     , span [ class "panel-label" ] [ text "Estatísticas" ]
                     , viewStatistics model
                     , span [ class "panel-label" ] [ text "Alturas" ]
@@ -703,6 +712,32 @@ view model =
             , kbd [] [ text "N" ]
             , text " liga os candidatos."
             ]
+        , viewVictoryModal model
+        ]
+
+
+viewBoardColumn : Model -> Html Msg
+viewBoardColumn model =
+    let
+        n =
+            model.game
+                |> Maybe.map (.puzzle >> Towers.size)
+                |> Maybe.withDefault 5
+
+        board =
+            case model.game of
+                Just game ->
+                    viewTowers game
+
+                Nothing ->
+                    div [ class "towers towers--waiting" ] []
+    in
+    div
+        [ class "board-column"
+        , attribute "style" ("--n: " ++ String.fromInt n)
+        ]
+        [ board
+        , div [ class "message-area" ] [ viewMessages model ]
         ]
 
 
@@ -748,13 +783,27 @@ viewDifficulty : Model -> Html Msg
 viewDifficulty model =
     let
         option difficulty =
+            let
+                ( name, size ) =
+                    case difficulty of
+                        Easy ->
+                            ( "Fácil", "4×4" )
+
+                        Medium ->
+                            ( "Médio", "5×5" )
+
+                        Hard ->
+                            ( "Difícil", "6×6" )
+            in
             button
                 [ class "difficulty-option"
                 , classList [ ( "difficulty-option--active", difficulty == model.difficulty ) ]
                 , disabled (isThinking model)
                 , onClick (NewGame difficulty)
                 ]
-                [ text (Api.difficultyLabel difficulty) ]
+                [ span [ class "difficulty-name" ] [ text name ]
+                , span [ class "difficulty-size" ] [ text size ]
+                ]
     in
     div [ class "difficulty-picker" ] (List.map option [ Easy, Medium, Hard ])
 
@@ -1011,29 +1060,31 @@ viewHeightPad model =
         marking =
             model.mode == Candidates
     in
-    div [ class "number-pad" ]
-        (List.map heightKey (List.range 1 maxHeight)
-            ++ [ button
-                    [ class "erase-key"
-                    , disabled inputDisabled
-                    , onClick ErasePressed
-                    ]
-                    [ text "⌫" ]
-               , button
-                    [ class "mode-toggle"
-                    , classList [ ( "mode-toggle--on", marking ) ]
-                    , onClick ModeToggled
-                    ]
-                    [ text
-                        (if marking then
-                            "✎ Anotando"
+    div [ class "height-pad" ]
+        [ div [ class "number-pad" ]
+            (List.map heightKey (List.range 1 maxHeight))
+        , div [ class "pad-actions" ]
+            [ button
+                [ class "erase-key"
+                , disabled inputDisabled
+                , onClick ErasePressed
+                ]
+                [ text "⌫" ]
+            , button
+                [ class "mode-toggle"
+                , classList [ ( "mode-toggle--on", marking ) ]
+                , onClick ModeToggled
+                ]
+                [ text
+                    (if marking then
+                        "✎ Anotando"
 
-                         else
-                            "✎ Candidatos"
-                        )
-                    ]
-               ]
-        )
+                     else
+                        "✎ Candidatos"
+                    )
+                ]
+            ]
+        ]
 
 
 viewActions : Model -> Html Msg
@@ -1164,3 +1215,113 @@ viewStatistics model =
 
         Nothing ->
             text ""
+
+
+viewVictoryModal : Model -> Html Msg
+viewVictoryModal model =
+    if not model.showVictoryModal then
+        text ""
+
+    else
+        case model.game of
+            Just game ->
+                let
+                    isRecord =
+                        game.newRecord
+
+                    ( title, subtitle, icon ) =
+                        if game.solverUsed then
+                            ( "Cidade Concluída com Ajuda"
+                            , "O Prolog encontrou a solução para você. Que tal tentar resolver sozinho agora?"
+                            , "🏙️"
+                            )
+
+                        else if game.hintsUsed > 0 then
+                            ( "Cidade Concluída com Dicas"
+                            , "Você usou "
+                                ++ String.fromInt game.hintsUsed
+                                ++ (if game.hintsUsed == 1 then
+                                        " dica para encontrar as alturas. Mandou bem!"
+
+                                    else
+                                        " dicas para encontrar as alturas. Mandou bem!"
+                                   )
+                            , "💡"
+                            )
+
+                        else
+                            ( "Parabéns! Cidade Erguida!"
+                            , "Você deduziu com perfeição a altura de todas as torres!"
+                            , "🎉"
+                            )
+                in
+                div [ class "modal-overlay" ]
+                    [ div [ class "modal-backdrop", onClick VictoryModalDismissed ] []
+                    , div [ class "modal-dialog victory-dialog" ]
+                        [ button
+                            [ class "modal-close"
+                            , attribute "aria-label" "Fechar modal e ver tabuleiro"
+                            , onClick VictoryModalDismissed
+                            ]
+                            [ text "✕" ]
+                        , div [ class "victory-header" ]
+                            [ span [ class "victory-icon" ] [ text icon ]
+                            , h2 [ class "victory-title" ] [ text title ]
+                            , p [ class "victory-subtitle" ] [ text subtitle ]
+                            ]
+                        , if isRecord then
+                            div [ class "victory-record-badge" ]
+                                [ text "🏆 Novo Recorde Pessoal!" ]
+
+                          else
+                            text ""
+                        , div [ class "victory-stats-grid" ]
+                            [ div [ class "victory-stat-card" ]
+                                [ span [ class "victory-stat-label" ] [ text "Tempo" ]
+                                , span [ class "victory-stat-value" ] [ text (Statistics.formatTime game.elapsedSeconds) ]
+                                ]
+                            , div [ class "victory-stat-card" ]
+                                [ span [ class "victory-stat-label" ] [ text "Dificuldade" ]
+                                , span [ class "victory-stat-value" ] [ text (Api.difficultyLabel game.difficulty) ]
+                                ]
+                            , div [ class "victory-stat-card" ]
+                                [ span [ class "victory-stat-label" ] [ text "Dicas Usadas" ]
+                                , span [ class "victory-stat-value" ]
+                                    [ text
+                                        (if game.hintsUsed == 0 then
+                                            "0 (Sem dicas)"
+
+                                         else
+                                            String.fromInt game.hintsUsed
+                                        )
+                                    ]
+                                ]
+                            , div [ class "victory-stat-card" ]
+                                [ span [ class "victory-stat-label" ] [ text "Auxílio Solver" ]
+                                , span [ class "victory-stat-value" ]
+                                    [ text
+                                        (if game.solverUsed then
+                                            "Sim"
+
+                                         else
+                                            "Não"
+                                        )
+                                    ]
+                                ]
+                            ]
+                        , div [ class "victory-new-game" ]
+                            [ span [ class "victory-new-game-label" ] [ text "Escolha a dificuldade do próximo jogo" ]
+                            , viewDifficulty model
+                            ]
+                        , div [ class "victory-actions" ]
+                            [ button
+                                [ class "btn btn-secondary victory-btn"
+                                , onClick VictoryModalDismissed
+                                ]
+                                [ text "Ver Tabuleiro" ]
+                            ]
+                        ]
+                    ]
+
+            Nothing ->
+                text ""
