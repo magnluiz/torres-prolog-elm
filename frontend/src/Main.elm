@@ -243,7 +243,7 @@ update msg model =
             ( updateGame (moveSelection dRow dCol) model, Cmd.none )
 
         UndoPressed ->
-            if isThinking model then
+            if boardInputLocked model then
                 ( model, Cmd.none )
 
             else
@@ -252,7 +252,7 @@ update msg model =
                 )
 
         RedoPressed ->
-            if isThinking model then
+            if boardInputLocked model then
                 ( model, Cmd.none )
 
             else
@@ -1073,14 +1073,14 @@ viewHistoryControls model =
     div [ class "history-controls" ]
         [ button
             [ class "history-button"
-            , disabled (isThinking model || not canUndo)
+            , disabled (boardInputLocked model || not canUndo)
             , onClick UndoPressed
             , attribute "title" "Desfazer (⌘Z no Mac; Ctrl+Z no Windows/Linux)"
             ]
             [ undoIcon, text "Desfazer" ]
         , button
             [ class "history-button"
-            , disabled (isThinking model || not canRedo)
+            , disabled (boardInputLocked model || not canRedo)
             , onClick RedoPressed
             , attribute "title" "Refazer (⌘⇧Z no Mac; Ctrl+Y no Windows/Linux)"
             ]
