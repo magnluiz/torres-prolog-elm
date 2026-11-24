@@ -342,50 +342,42 @@ replace_nth0(Index, List, Elem, NewList) :-
 
 %!  hint(+Puzzle, +Board, -Result) is det.
 %
-%   Result é uma lista [Linha, Coluna, Altura] (uma casa vazia, sorteada, e
-%   a altura certa), ou o átomo `complete` (não há casa vazia) ou
+%   Result é uma lista [Linha, Coluna, Altura, Explicação] (uma casa vazia,
+%   preferindo as de dedução mais simples, e a altura certa), ou o átomo `complete` (não há casa vazia) ou
 %   `unsolvable` (o que o jogador colocou já contradiz as regras).
 hint(Puzzle, Board, Result) :-
     (   solve(Puzzle, Board, Solution)
     ->  empty_positions(Board, Empty),
         (   Empty == []
         ->  Result = complete
-
-        ;   % Caso 1: Procura por deduções diretas com prioridade pedagógica
-           findall(
+        ;   % Deduções diretas, cada uma com sua prioridade pedagógica.
+            findall(
                 candidate(Priority, Row, Col, Value, Explanation),
-                (
-                    member(Row-Col, Empty),
+                (   member(Row-Col, Empty),
                     nth0(Row, Solution, SolutionRow),
                     nth0(Col, SolutionRow, Value),
-                    explain_cell_deductive(Puzzle, Board, Row, Col, Value, Priority, Explanation)
+                    explain_cell_deductive(Puzzle, Board, Row, Col, Value,
+                                           Priority, Explanation)
                 ),
                 DeductiveCandidates
             ),
-            
-            % Caso 2: Se não houver deduções diretas, recorre ao caso geral do explicador
             (   DeductiveCandidates \= []
-
-                ->  % Pega somente as de menor prioridade (mais fáceis)
-                    findall(P, member(candidate(P, _, _, _, _), DeductiveCandidates), Priorities),
-                    min_list(Priorities, MinP),
-                    findall(
-                        candidate(MinP, R, C, V, E),
+            ->  % Fica só com as de menor prioridade (as mais fáceis).
+                findall(P, member(candidate(P, _, _, _, _), DeductiveCandidates),
+                        Priorities),
+                min_list(Priorities, MinP),
+                findall(candidate(MinP, R, C, V, E),
                         member(candidate(MinP, R, C, V, E), DeductiveCandidates),
-                        BestCandidates
-                    ),
-                    random_member(
-                        candidate(_, Row, Col, Value, Explanation), 
-                        BestCandidates
-                    ),
-                    Result = [Row, Col, Value, Explanation]
-                
-                ;
-                    random_member(Row-Col, Empty),
-                    nth0(Row, Solution, SolutionRow),
-                    nth0(Col, SolutionRow, Value),
-                    explain_cell(Puzzle, Board, Row, Col, Value, Explanation),
-                    Result = [Row, Col, Value, Explanation]
+                        BestCandidates),
+                random_member(candidate(_, Row, Col, Value, Explanation),
+                              BestCandidates),
+                Result = [Row, Col, Value, Explanation]
+            ;   % Sem dedução direta: sorteia uma casa e usa a explicação geral.
+                random_member(Row-Col, Empty),
+                nth0(Row, Solution, SolutionRow),
+                nth0(Col, SolutionRow, Value),
+                explain_cell(Puzzle, Board, Row, Col, Value, Explanation),
+                Result = [Row, Col, Value, Explanation]
             )
         )
     ;   Result = unsolvable

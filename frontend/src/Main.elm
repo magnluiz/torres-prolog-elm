@@ -152,6 +152,7 @@ type Msg
     | ErrorDismissed
     | ClockStarted Time.Posix
     | Tick Time.Posix
+    | GameCompleted Time.Posix
     | VictoryModalDismissed
 
 
@@ -328,6 +329,9 @@ update msg model =
         Tick now ->
             updateTimer now model
 
+        GameCompleted now ->
+            finishGame now model
+
 
 updateTimer : Time.Posix -> Model -> ( Model, Cmd Msg )
 updateTimer now model =
@@ -357,10 +361,41 @@ updateTimer now model =
             ( model, Cmd.none )
 
 
+{-| Se o tabuleiro acabou de ser completado, pede a hora atual; o tempo final
+é fechado em `GameCompleted`, sem a defasagem de até 1s do último `Tick`.
+-}
 finishIfComplete : Model -> ( Model, Cmd Msg )
 finishIfComplete model =
     case model.game of
         Just game ->
+            if
+                game.startedAt
+                    /= Nothing
+                    && not game.finished
+                    && Towers.isComplete game.puzzle game.board
+            then
+                ( model, Task.perform GameCompleted Time.now )
+
+            else
+                ( model, Cmd.none )
+
+        Nothing ->
+            ( model, Cmd.none )
+
+
+finishGame : Time.Posix -> Model -> ( Model, Cmd Msg )
+finishGame now model =
+    case model.game of
+        Just game0 ->
+            let
+                game =
+                    case game0.startedAt of
+                        Just startedAt ->
+                            { game0 | elapsedSeconds = Statistics.elapsedSeconds startedAt now }
+
+                        Nothing ->
+                            game0
+            in
             case game.startedAt of
                 Just _ ->
                     if game.finished || not (Towers.isComplete game.puzzle game.board) then
@@ -388,7 +423,6 @@ finishIfComplete model =
                                     , status = Idle
                                     , showVictoryModal = True
                                 }
-
                         in
                         if updatedRecords == model.bestTimes then
                             ( finishedModel, Cmd.none )
@@ -845,7 +879,7 @@ viewMessages model =
             HintGiven explanation ->
                 div [ class "message message--info" ]
                     [ span [] [ text ("Dica: " ++ explanation) ]
-                    , button [ class "message-close", onClick ErrorDismissed ] [ text "x" ]
+                    , button [ class "message-close", onClick ErrorDismissed ] [ text "✕" ]
                     ]
 
             Idle ->
