@@ -108,14 +108,14 @@ test(bad_difficulty, error(type_error(_, impossible))) :-
 test(hint_matches_solution, true(Value == Expected)) :-
     example_puzzle(P),
     empty_board(4, B),
-    hint(P, B, [Row, Col, Value]),
+    hint(P, B, [Row, Col, Value, _Explanation]),
     solve(P, S),
     nth0(Row, S, SRow), nth0(Col, SRow, Expected).
 
 test(hint_on_empty_cell, true(Cell == 0)) :-
     example_puzzle(P),
     B = [[1,2,3,4],[0,0,0,0],[3,4,1,2],[4,1,2,3]],
-    hint(P, B, [Row, Col, _]),
+    hint(P, B, [Row, Col, _, _Explanation]),
     nth0(Row, B, BRow), nth0(Col, BRow, Cell).
 
 test(complete_board, true(Result == complete)) :-
@@ -126,5 +126,14 @@ test(complete_board, true(Result == complete)) :-
 test(unsolvable_board, true(Result == unsolvable)) :-
     example_puzzle(P),
     hint(P, [[4,0,0,0],[0,0,0,0],[0,0,0,0],[0,0,0,0]], Result).
+
+% hint deve escolher entre as candidatas de menor prioridade. Com a linha 0
+% em [1,2,3,0], a casa (0,3)=4 é a única com prioridade 1 (single_in_row);
+% as demais exigem regras de prioridade maior ou nenhuma dedução direta.
+test(hint_prefers_lowest_priority_candidate,
+     true((Row == 0, Col == 3, Val == 4))) :-
+    example_puzzle(P),
+    Board = [[1,2,3,0],[0,0,0,0],[0,0,0,0],[0,0,0,0]],
+    hint(P, Board, [Row, Col, Val, _Explanation]).
 
 :- end_tests(hint).

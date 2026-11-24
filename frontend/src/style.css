@@ -444,6 +444,14 @@
     }
   }
 
+  .board-column {
+    --cell: calc(var(--board-size) / (var(--n, 5) + 2));
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+    width: var(--board-size);
+  }
+
   .side-panel {
     @apply flex flex-col gap-4 rounded-box p-5;
     background: var(--glass-bg);
@@ -455,10 +463,21 @@
   .panel-label {
     @apply text-xs font-semibold tracking-widest uppercase opacity-60;
   }
+  .game-stats {
+    @apply grid gap-1 text-sm;
+  }
+  .game-stat {
+    @apply flex justify-between;
+  }
+  .game-stat span:last-child {
+    @apply font-semibold;
+    font-variant-numeric: tabular-nums;
+  }
 
-  /* Área de mensagens com altura fixa, para o layout não "pular". */
+  /* Mensagens abaixo do tabuleiro; não ocupam espaço quando estão vazias. */
   .message-area {
-    @apply flex min-h-14 items-center;
+    width: calc(var(--cell) * var(--n, 5));
+    margin-inline: auto;
   }
 
   /* ---------- Dificuldade ---------- */
@@ -469,10 +488,23 @@
 
   .difficulty-option {
     @apply btn join-item flex-1;
+    min-height: 3.25rem;
+    padding: 0.5rem 0.65rem;
+    flex-direction: column;
+    gap: 0.1rem;
+    line-height: 1.2;
+    text-align: center;
+    white-space: nowrap;
 
     &.difficulty-option--active {
       @apply btn-primary;
     }
+  }
+
+  .difficulty-size {
+    font-size: 0.8rem;
+    line-height: 1;
+    opacity: 0.8;
   }
 
   /* ---------- Mensagens ---------- */
@@ -481,6 +513,7 @@
     @apply alert w-full text-sm;
   }
   .message--error   { @apply alert-error; }
+  .message--info    { @apply alert-info; }
   .message--success { @apply alert-success; }
   .message--loading { @apply alert-soft; }
 
@@ -637,7 +670,6 @@
   .cell--selected {
     --cell-bg: var(--cell-selected);
     color: var(--color-primary-content);
-    box-shadow: inset 0 0 0 2px color-mix(in oklch, var(--color-primary-content) 35%, transparent);
 
     &:hover { background-color: var(--cell-bg); }
 
@@ -764,6 +796,12 @@
 
   /* ---------- Teclado numérico ---------- */
 
+  .height-pad {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+  }
+
   .number-pad {
     @apply grid grid-cols-3 gap-2;
   }
@@ -793,11 +831,19 @@
   }
 
   .erase-key {
-    @apply btn btn-lg btn-ghost col-span-1 h-auto min-h-12 text-xl;
+    @apply btn btn-lg btn-outline text-xl;
+    height: 3rem;
+    min-height: 3rem;
+  }
+
+  .pad-actions {
+    @apply grid grid-cols-3 gap-2;
   }
 
   .mode-toggle {
-    @apply btn btn-lg col-span-2 h-auto min-h-12;
+    @apply btn btn-lg col-span-2;
+    height: 3rem;
+    min-height: 3rem;
 
     &.mode-toggle--on {
       @apply btn-warning;
@@ -814,6 +860,9 @@
   .action-button--hint    { @apply btn-secondary; }
   .action-button--solve   { @apply btn-accent; }
   .action-button--reset   { @apply btn-ghost; }
+  .history-controls { @apply grid grid-cols-2 gap-2; }
+  .history-button { @apply btn btn-sm btn-outline; gap: 0.5rem; }
+  .history-button:disabled { opacity: 0.4; }
 
   /* ---------- Como jogar ---------- */
 
@@ -822,6 +871,91 @@
     summary { @apply cursor-pointer font-semibold; }
     ul      { @apply mt-2 list-disc space-y-1 pl-5; }
     p       { @apply mt-2 opacity-70; }
+  }
+
+  /* ---------- Modal de Vitória ---------- */
+
+  .modal-overlay {
+    @apply fixed inset-0 flex items-center justify-center p-4;
+    z-index: 50;
+    overflow: hidden;
+  }
+
+  .modal-backdrop {
+    @apply fixed inset-0 bg-black/60;
+    z-index: 10;
+    backdrop-filter: blur(6px);
+    animation: fade-in 0.3s ease-out forwards;
+  }
+
+  .victory-dialog {
+    @apply relative flex flex-col items-center gap-4 rounded-3xl p-6 sm:p-8 max-w-md w-full text-center;
+    z-index: 30;
+    background: var(--glass-bg);
+    backdrop-filter: blur(var(--glass-blur));
+    border: 1px solid var(--glass-border);
+    box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5), 0 0 40px color-mix(in oklch, var(--color-primary) 20%, transparent);
+    animation: modal-pop 0.4s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  }
+
+  .modal-close {
+    @apply absolute top-4 right-4 btn btn-circle btn-ghost btn-sm text-base opacity-70 hover:opacity-100;
+  }
+
+  .victory-header {
+    @apply flex flex-col items-center gap-2;
+  }
+
+  .victory-icon {
+    @apply text-5xl sm:text-6xl select-none;
+    animation: icon-bounce 1s ease-in-out infinite alternate;
+  }
+
+  .victory-title {
+    @apply font-serif text-2xl sm:text-3xl font-bold tracking-tight;
+    color: var(--color-base-content);
+  }
+
+  .victory-subtitle {
+    @apply text-sm opacity-80 max-w-xs;
+  }
+
+  .victory-record-badge {
+    @apply inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold tracking-wide uppercase bg-amber-500/20 text-amber-300 border border-amber-500/40;
+    animation: badge-glow 2s ease-in-out infinite alternate;
+  }
+
+  .victory-stats-grid {
+    @apply grid grid-cols-2 gap-3 w-full my-2;
+  }
+
+  .victory-new-game {
+    @apply grid w-full gap-2 text-left;
+  }
+
+  .victory-new-game-label {
+    @apply text-xs font-semibold uppercase tracking-wider opacity-70;
+  }
+
+  .victory-stat-card {
+    @apply flex flex-col items-center justify-center p-3 rounded-2xl bg-base-200/50 border border-base-content/5;
+  }
+
+  .victory-stat-label {
+    @apply text-xs uppercase tracking-wider opacity-60 font-medium;
+  }
+
+  .victory-stat-value {
+    @apply text-lg sm:text-xl font-bold mt-0.5;
+    font-variant-numeric: tabular-nums;
+  }
+
+  .victory-actions {
+    @apply flex flex-col sm:flex-row gap-3 w-full mt-2;
+  }
+
+  .victory-btn {
+    @apply flex-1 py-3 text-sm font-semibold rounded-xl;
   }
 }
 
@@ -851,6 +985,32 @@
 @keyframes reveal {
   0%   { filter: blur(6px); opacity: 0; transform: translateY(20%); }
   100% { filter: blur(0); opacity: 1; transform: none; }
+}
+
+@keyframes modal-pop {
+  0% {
+    transform: scale(0.85) translateY(20px);
+    opacity: 0;
+  }
+  100% {
+    transform: scale(1) translateY(0);
+    opacity: 1;
+  }
+}
+
+@keyframes fade-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes icon-bounce {
+  from { transform: translateY(0) scale(1); }
+  to { transform: translateY(-8px) scale(1.1); }
+}
+
+@keyframes badge-glow {
+  from { box-shadow: 0 0 4px rgba(245, 158, 11, 0.2); }
+  to { box-shadow: 0 0 16px rgba(245, 158, 11, 0.6); }
 }
 
 /* Quem configurou o sistema para "reduzir movimento" não vê animações. */

@@ -132,14 +132,28 @@
 
   .difficulty-option {
     @apply btn join-item flex-1;
+    min-height: 3.25rem;
+    padding: 0.5rem 0.65rem;
+    flex-direction: column;
+    gap: 0.1rem;
+    line-height: 1.2;
+    text-align: center;
+    white-space: nowrap;
   }
 
   .difficulty-option--active {
     @apply btn-primary;
   }
 
+  .difficulty-size {
+    font-size: 0.8rem;
+    line-height: 1;
+    opacity: 0.8;
+  }
+
   .message          { @apply alert w-full text-sm; }
   .message--error   { @apply alert-error; }
+  .message--info    { @apply alert-info; }
   .message--success { @apply alert-success; }
   .message--loading { @apply alert-soft; }
   .message-close    { @apply btn btn-ghost btn-xs; }
@@ -274,6 +288,88 @@
   .action-button--hint  { @apply btn-secondary; }
   .action-button--solve { @apply btn-accent; }
   .action-button--reset { @apply btn-ghost; }
+
+  .game-stats           { @apply grid gap-1 text-sm; }
+  .game-stat            { @apply flex justify-between; }
+  .game-stat span:last-child { @apply font-semibold; }
+
+  .history-controls     { @apply grid grid-cols-2 gap-2; }
+  .history-button       { @apply btn btn-sm btn-outline; gap: 0.5rem; }
+  .history-button:disabled { opacity: 0.4; }
+
+  /* ---------- Modal de Vitória ---------- */
+
+  .modal-overlay {
+    @apply fixed inset-0 z-50 flex items-center justify-center p-4;
+    overflow: hidden;
+  }
+
+  .modal-backdrop {
+    @apply fixed inset-0 bg-black/60;
+  }
+
+  .victory-dialog {
+    @apply relative z-10 flex flex-col items-center gap-4 rounded-3xl p-6 sm:p-8 max-w-md w-full text-center bg-base-100 shadow-2xl;
+  }
+
+  .modal-close {
+    @apply absolute top-4 right-4 btn btn-circle btn-ghost btn-sm;
+  }
+
+  .victory-header {
+    @apply flex flex-col items-center gap-2;
+  }
+
+  .victory-icon {
+    @apply text-5xl sm:text-6xl;
+  }
+
+  .victory-title {
+    @apply text-2xl font-bold;
+  }
+
+  .victory-subtitle {
+    @apply text-sm opacity-80;
+  }
+
+  .victory-record-badge {
+    @apply badge badge-warning gap-1 p-3 font-bold;
+  }
+
+  .victory-stats-grid {
+    @apply grid grid-cols-2 gap-3 w-full my-2;
+  }
+
+  .victory-new-game {
+    display: grid;
+    width: 100%;
+    gap: 0.5rem;
+    text-align: left;
+  }
+
+  .victory-new-game-label {
+    @apply text-xs font-semibold uppercase tracking-wider opacity-70;
+  }
+
+  .victory-stat-card {
+    @apply flex flex-col items-center justify-center p-3 rounded-xl bg-base-200;
+  }
+
+  .victory-stat-label {
+    @apply text-xs uppercase opacity-60 font-medium;
+  }
+
+  .victory-stat-value {
+    @apply text-lg font-bold;
+  }
+
+  .victory-actions {
+    @apply flex flex-col sm:flex-row gap-3 w-full mt-2;
+  }
+
+  .victory-btn {
+    @apply flex-1;
+  }
 }
 
 @layer components {

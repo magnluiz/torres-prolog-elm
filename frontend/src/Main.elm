@@ -1,4 +1,4 @@
-module Main exposing (main)
+port module Main exposing (main)
 
 {-| Interface gráfica das Torres Latinas, na Arquitetura Elm:
 
@@ -12,12 +12,21 @@ module Main exposing (main)
 import Api exposing (Difficulty(..))
 import Browser
 import Browser.Events
-import Html exposing (Html, aside, button, details, div, footer, h1, header, input, label, li, main_, p, span, summary, text, ul)
+import Html exposing (Html, aside, button, details, div, footer, h1, h2, header, input, label, li, main_, p, span, summary, text, ul)
 import Html.Attributes exposing (attribute, checked, class, classList, disabled, type_, value)
 import Html.Events exposing (onCheck, onClick)
 import Json.Decode as Decode exposing (Decoder)
+import Json.Encode as Encode
 import Set exposing (Set)
+import Statistics
+import Svg exposing (path, svg)
+import Svg.Attributes as SvgAttr
+import Task
+import Time
 import Towers exposing (Board, Cell(..), Clue(..), ClueStatus(..), Position, Puzzle, Side(..))
+
+
+port saveBestTimes : Encode.Value -> Cmd msg
 
 
 
@@ -42,6 +51,7 @@ main =
 -}
 type alias Flags =
     { darkTheme : Bool
+    , bestTimes : Statistics.BestTimes
     }
 
 
@@ -51,6 +61,8 @@ type alias Model =
     , mode : InputMode
     , status : Status
     , darkTheme : Bool
+    , bestTimes : Statistics.BestTimes
+    , showVictoryModal : Bool
     }
 
 
@@ -62,7 +74,21 @@ chegar, `Model.game` é `Nothing`.
 type alias Game =
     { puzzle : Puzzle
     , board : Board
+    , history : History
     , selected : Maybe Position
+    , difficulty : Difficulty
+    , startedAt : Maybe Time.Posix
+    , elapsedSeconds : Int
+    , hintsUsed : Int
+    , solverUsed : Bool
+    , finished : Bool
+    , newRecord : Bool
+    }
+
+
+type alias History =
+    { past : List Board
+    , future : List Board
     }
 
 
@@ -77,6 +103,7 @@ estados possíveis.
 type Status
     = Idle
     | Thinking
+    | HintGiven String
     | Failed String
 
 
@@ -95,6 +122,8 @@ init flags =
       , mode = Heights
       , status = Thinking
       , darkTheme = flags.darkTheme
+      , bestTimes = flags.bestTimes
+      , showVictoryModal = False
       }
     , Api.generate Medium GotPuzzle
     )
@@ -113,28 +142,48 @@ type Msg
     | ModeToggled
     | ThemeToggled Bool
     | MoveSelection Int Int
+    | UndoPressed
+    | RedoPressed
     | HintRequested
     | GotHint (Result String Api.Hint)
     | SolveRequested
     | GotSolution (Result String (List (List Int)))
     | ResetRequested
     | ErrorDismissed
+    | ClockStarted Time.Posix
+    | Tick Time.Posix
+    | GameCompleted Time.Posix
+    | VictoryModalDismissed
 
 
 update : Msg -> Model -> ( Model, Cmd Msg )
 update msg model =
     case msg of
         NewGame difficulty ->
-            ( { model | difficulty = difficulty, status = Thinking }
+            ( { model | difficulty = difficulty, status = Thinking, showVictoryModal = False }
             , Api.generate difficulty GotPuzzle
             )
 
         GotPuzzle (Ok puzzle) ->
             ( { model
-                | game = Just { puzzle = puzzle, board = Towers.emptyBoard puzzle, selected = Nothing }
+                | game =
+                    Just
+                        { puzzle = puzzle
+                        , board = Towers.emptyBoard puzzle
+                        , history = { past = [], future = [] }
+                        , selected = Nothing
+                        , difficulty = model.difficulty
+                        , startedAt = Nothing
+                        , elapsedSeconds = 0
+                        , hintsUsed = 0
+                        , solverUsed = False
+                        , finished = False
+                        , newRecord = False
+                        }
                 , status = Idle
+                , showVictoryModal = False
               }
-            , Cmd.none
+            , Task.perform ClockStarted Time.now
             )
 
         GotPuzzle (Err error) ->
@@ -144,36 +193,48 @@ update msg model =
             ( updateGame (\game -> { game | selected = Just position }) model, Cmd.none )
 
         HeightPressed height ->
-            let
-                change =
-                    case model.mode of
-                        Heights ->
-                            Towers.placeHeight Placed height
+            if boardInputLocked model then
+                ( model, Cmd.none )
 
-                        Candidates ->
-                            \position -> Towers.toggleMark position height
+            else
+                let
+                    change =
+                        case model.mode of
+                            Heights ->
+                                Towers.placeHeight Placed height
 
-                -- As teclas vão de 1 a 9, mas a grade só de 4 a 6: alturas
-                -- maiores que a grade são ignoradas.
-                fits game =
-                    height <= Towers.size game.puzzle
-            in
-            ( updateGame
-                (\game ->
-                    if fits game then
-                        changeSelected change game
+                            Candidates ->
+                                \position -> Towers.toggleMark position height
 
-                    else
-                        game
-                )
-                model
-            , Cmd.none
-            )
+                    -- Ignora alturas maiores que o tamanho da grade.
+                    fits game =
+                        height <= Towers.size game.puzzle
+
+                    updatedModel =
+                        updateGame
+                            (\game ->
+                                if fits game then
+                                    changeSelected change game
+
+                                else
+                                    game
+                            )
+                            (dismissHint model)
+                in
+                finishIfComplete updatedModel
 
         ErasePressed ->
-            ( updateGame (changeSelected (\position -> Towers.setCell position Empty)) model
-            , Cmd.none
-            )
+            if boardInputLocked model then
+                ( model, Cmd.none )
+
+            else
+                finishIfComplete
+                    (updateGame
+                        (changeSelected
+                            (\position -> Towers.setCell position Empty)
+                        )
+                        (dismissHint model)
+                    )
 
         ModeToggled ->
             ( { model | mode = toggleMode model.mode }, Cmd.none )
@@ -186,20 +247,40 @@ update msg model =
         MoveSelection dRow dCol ->
             ( updateGame (moveSelection dRow dCol) model, Cmd.none )
 
+        UndoPressed ->
+            if boardInputLocked model then
+                ( model, Cmd.none )
+
+            else
+                ( updateGame undoGame { model | status = Idle }
+                , Cmd.none
+                )
+
+        RedoPressed ->
+            if boardInputLocked model then
+                ( model, Cmd.none )
+
+            else
+                ( updateGame redoGame { model | status = Idle }
+                , Cmd.none
+                )
+
         HintRequested ->
             askProlog Api.hint GotHint model
 
-        GotHint (Ok { row, col, value }) ->
-            ( updateGame
-                (\game ->
-                    { game
-                        | board = Towers.placeHeight Revealed value ( row, col ) game.board
-                        , selected = Just ( row, col )
-                    }
+        GotHint (Ok { row, col, value, explanation }) ->
+            finishIfComplete
+                (updateGame
+                    (\game ->
+                        recordBoard
+                            (Towers.placeHeight Revealed value ( row, col ) game.board)
+                            { game
+                                | selected = Just ( row, col )
+                                , hintsUsed = game.hintsUsed + 1
+                            }
+                    )
+                    { model | status = HintGiven explanation }
                 )
-                { model | status = Idle }
-            , Cmd.none
-            )
 
         GotHint (Err error) ->
             ( { model | status = Failed error }, Cmd.none )
@@ -211,21 +292,187 @@ update msg model =
             askProlog (\puzzle _ -> Api.solve puzzle (Towers.emptyBoard puzzle)) GotSolution model
 
         GotSolution (Ok solution) ->
-            ( updateGame (\game -> { game | board = Towers.revealSolution solution game.board })
-                { model | status = Idle }
-            , Cmd.none
-            )
+            finishIfComplete
+                (updateGame
+                    (\game ->
+                        recordBoard
+                            (Towers.revealSolution solution game.board)
+                            { game | solverUsed = True }
+                    )
+                    { model | status = Idle }
+                )
 
         GotSolution (Err error) ->
             ( { model | status = Failed error }, Cmd.none )
 
         ResetRequested ->
-            ( updateGame (\game -> { game | board = Towers.emptyBoard game.puzzle }) { model | status = Idle }
-            , Cmd.none
-            )
+            if boardInputLocked model then
+                ( model, Cmd.none )
+
+            else
+                ( updateGame
+                    (\game -> recordBoard (Towers.emptyBoard game.puzzle) game)
+                    { model | status = Idle }
+                , Cmd.none
+                )
 
         ErrorDismissed ->
             ( { model | status = Idle }, Cmd.none )
+
+        VictoryModalDismissed ->
+            ( { model | showVictoryModal = False }, Cmd.none )
+
+        ClockStarted startedAt ->
+            finishIfComplete
+                (updateGame (\game -> { game | startedAt = Just startedAt }) model)
+
+        Tick now ->
+            updateTimer now model
+
+        GameCompleted now ->
+            finishGame now model
+
+
+updateTimer : Time.Posix -> Model -> ( Model, Cmd Msg )
+updateTimer now model =
+    case model.game of
+        Just game ->
+            case game.startedAt of
+                Just startedAt ->
+                    if game.finished then
+                        ( model, Cmd.none )
+
+                    else
+                        let
+                            elapsed =
+                                Statistics.elapsedSeconds startedAt now
+
+                            updatedModel =
+                                updateGame
+                                    (\current -> { current | elapsedSeconds = elapsed })
+                                    model
+                        in
+                        finishIfComplete updatedModel
+
+                Nothing ->
+                    ( model, Cmd.none )
+
+        Nothing ->
+            ( model, Cmd.none )
+
+
+{-| Se o tabuleiro acabou de ser completado, pede a hora atual; o tempo final
+é fechado em `GameCompleted`, sem a defasagem de até 1s do último `Tick`.
+-}
+finishIfComplete : Model -> ( Model, Cmd Msg )
+finishIfComplete model =
+    case model.game of
+        Just game ->
+            if
+                game.startedAt
+                    /= Nothing
+                    && not game.finished
+                    && Towers.isComplete game.puzzle game.board
+            then
+                ( model, Task.perform GameCompleted Time.now )
+
+            else
+                ( model, Cmd.none )
+
+        Nothing ->
+            ( model, Cmd.none )
+
+
+finishGame : Time.Posix -> Model -> ( Model, Cmd Msg )
+finishGame now model =
+    case model.game of
+        Just game0 ->
+            let
+                game =
+                    case game0.startedAt of
+                        Just startedAt ->
+                            { game0 | elapsedSeconds = Statistics.elapsedSeconds startedAt now }
+
+                        Nothing ->
+                            game0
+            in
+            case game.startedAt of
+                Just _ ->
+                    if game.finished || not (Towers.isComplete game.puzzle game.board) then
+                        ( model, Cmd.none )
+
+                    else
+                        let
+                            updatedRecords =
+                                Statistics.recordIfEligible
+                                    game.difficulty
+                                    game.elapsedSeconds
+                                    game.hintsUsed
+                                    game.solverUsed
+                                    model.bestTimes
+
+                            newRecord =
+                                updatedRecords /= model.bestTimes
+
+                            finishedGame =
+                                { game | finished = True, newRecord = newRecord }
+
+                            finishedModel =
+                                { model
+                                    | game = Just finishedGame
+                                    , status = Idle
+                                    , showVictoryModal = True
+                                }
+                        in
+                        if updatedRecords == model.bestTimes then
+                            ( finishedModel, Cmd.none )
+
+                        else
+                            let
+                                modelWithRecord =
+                                    { finishedModel | bestTimes = updatedRecords }
+                            in
+                            ( modelWithRecord
+                            , saveBestTimes (encodeBestTimes updatedRecords)
+                            )
+
+                Nothing ->
+                    ( model, Cmd.none )
+
+        Nothing ->
+            ( model, Cmd.none )
+
+
+encodeBestTimes : Statistics.BestTimes -> Encode.Value
+encodeBestTimes records =
+    Encode.object
+        [ ( "easy", encodeMaybeInt records.easy )
+        , ( "medium", encodeMaybeInt records.medium )
+        , ( "hard", encodeMaybeInt records.hard )
+        ]
+
+
+encodeMaybeInt : Maybe Int -> Encode.Value
+encodeMaybeInt maybeSeconds =
+    case maybeSeconds of
+        Just seconds ->
+            Encode.int seconds
+
+        Nothing ->
+            Encode.null
+
+
+{-| Limpa a mensagem de dica se ela estiver visível, voltando o estado
+para `Idle`. Usada quando o jogador volta a interagir com o tabuleiro.
+-}
+dismissHint : Model -> Model
+dismissHint model =
+    case model.status of
+        HintGiven _ ->
+            { model | status = Idle }
+
+        _ ->
+            model
 
 
 {-| Aplica uma alteração à partida, se houver uma. `Maybe.map` faz
@@ -234,6 +481,59 @@ exatamente isso: aplica a função dentro do `Just` e deixa `Nothing` como está
 updateGame : (Game -> Game) -> Model -> Model
 updateGame change model =
     { model | game = Maybe.map change model.game }
+
+
+{-| Atualiza o tabuleiro e registra o estado anterior na pilha de "desfazer".
+-}
+recordBoard : Board -> Game -> Game
+recordBoard nextBoard game =
+    if nextBoard == game.board then
+        game
+
+    else
+        { game
+            | board = nextBoard
+            , history =
+                { past = game.board :: game.history.past
+                , future = []
+                }
+        }
+
+
+{-| Desfaz a última jogada, se houver. O tabuleiro atual vai para a pilha de "refazer".
+-}
+undoGame : Game -> Game
+undoGame game =
+    case game.history.past of
+        previousBoard :: remainingPast ->
+            { game
+                | board = previousBoard
+                , history =
+                    { past = remainingPast
+                    , future = game.board :: game.history.future
+                    }
+            }
+
+        [] ->
+            game
+
+
+{-| Refaz a última jogada desfeita, se houver. O tabuleiro atual vai para a pilha de "desfazer".
+-}
+redoGame : Game -> Game
+redoGame game =
+    case game.history.future of
+        nextBoard :: remainingFuture ->
+            { game
+                | board = nextBoard
+                , history =
+                    { past = game.board :: game.history.past
+                    , future = remainingFuture
+                    }
+            }
+
+        [] ->
+            game
 
 
 {-| Monta um pedido ao Prolog com o puzzle e o tabuleiro da partida atual.
@@ -258,7 +558,7 @@ changeSelected : (Position -> Board -> Board) -> Game -> Game
 changeSelected change game =
     case game.selected of
         Just position ->
-            { game | board = change position game.board }
+            recordBoard (change position game.board) game
 
         Nothing ->
             game
@@ -292,8 +592,30 @@ toggleMode mode =
 
 
 subscriptions : Model -> Sub Msg
-subscriptions _ =
-    Browser.Events.onKeyDown keyDecoder
+subscriptions model =
+    Sub.batch
+        [ Browser.Events.onKeyDown keyDecoder
+        , timerSubscription model
+        ]
+
+
+timerSubscription : Model -> Sub Msg
+timerSubscription model =
+    case model.game of
+        Just game ->
+            case game.startedAt of
+                Just _ ->
+                    if game.finished then
+                        Sub.none
+
+                    else
+                        Time.every 1000 Tick
+
+                Nothing ->
+                    Sub.none
+
+        Nothing ->
+            Sub.none
 
 
 {-| Teclas que não nos interessam fazem o decoder FALHAR, e um decoder que
@@ -301,8 +623,32 @@ falha não gera mensagem nenhuma.
 -}
 keyDecoder : Decoder Msg
 keyDecoder =
-    Decode.field "key" Decode.string
-        |> Decode.andThen keyToMsg
+    Decode.map4 keyToMsgWithModifiers
+        (Decode.field "key" Decode.string)
+        (Decode.field "ctrlKey" Decode.bool)
+        (Decode.field "metaKey" Decode.bool)
+        (Decode.field "shiftKey" Decode.bool)
+        |> Decode.andThen identity
+
+
+keyToMsgWithModifiers : String -> Bool -> Bool -> Bool -> Decoder Msg
+keyToMsgWithModifiers key ctrlKey metaKey shiftKey =
+    if ctrlKey || metaKey then
+        case ( String.toLower key, shiftKey ) of
+            ( "z", True ) ->
+                Decode.succeed RedoPressed
+
+            ( "z", False ) ->
+                Decode.succeed UndoPressed
+
+            ( "y", _ ) ->
+                Decode.succeed RedoPressed
+
+            _ ->
+                Decode.fail "Atalho ignorado"
+
+    else
+        keyToMsg key
 
 
 keyToMsg : String -> Decoder Msg
@@ -331,6 +677,9 @@ keyToMsg key =
 
         "N" ->
             Decode.succeed ModeToggled
+
+        "Escape" ->
+            Decode.succeed VictoryModalDismissed
 
         _ ->
             case String.toInt key of
@@ -370,18 +719,16 @@ view model =
             ]
         , main_ [ class "app-main" ]
             [ div [ class "app-container game" ]
-                [ case model.game of
-                    Just game ->
-                        viewTowers game
-
-                    Nothing ->
-                        div [ class "towers towers--waiting" ] []
+                [ viewBoardColumn model
                 , aside [ class "side-panel" ]
                     [ span [ class "panel-label" ] [ text "Novo jogo" ]
                     , viewDifficulty model
-                    , div [ class "message-area" ] [ viewMessages model ]
+                    , span [ class "panel-label" ] [ text "Estatísticas" ]
+                    , viewStatistics model
                     , span [ class "panel-label" ] [ text "Alturas" ]
                     , viewHeightPad model
+                    , span [ class "panel-label" ] [ text "Histórico" ]
+                    , viewHistoryControls model
                     , span [ class "panel-label" ] [ text "Ajuda" ]
                     , viewActions model
                     , viewRules
@@ -399,6 +746,32 @@ view model =
             , kbd [] [ text "N" ]
             , text " liga os candidatos."
             ]
+        , viewVictoryModal model
+        ]
+
+
+viewBoardColumn : Model -> Html Msg
+viewBoardColumn model =
+    let
+        n =
+            model.game
+                |> Maybe.map (.puzzle >> Towers.size)
+                |> Maybe.withDefault 5
+
+        board =
+            case model.game of
+                Just game ->
+                    viewTowers game
+
+                Nothing ->
+                    div [ class "towers towers--waiting" ] []
+    in
+    div
+        [ class "board-column"
+        , attribute "style" ("--n: " ++ String.fromInt n)
+        ]
+        [ board
+        , div [ class "message-area" ] [ viewMessages model ]
         ]
 
 
@@ -428,47 +801,89 @@ isThinking model =
     model.status == Thinking
 
 
+boardInputLocked : Model -> Bool
+boardInputLocked model =
+    isThinking model
+        || (case model.game of
+                Just game ->
+                    game.finished || Towers.isComplete game.puzzle game.board
+
+                Nothing ->
+                    True
+           )
+
+
 viewDifficulty : Model -> Html Msg
 viewDifficulty model =
     let
         option difficulty =
+            let
+                ( name, size ) =
+                    case difficulty of
+                        Easy ->
+                            ( "Fácil", "4×4" )
+
+                        Medium ->
+                            ( "Médio", "5×5" )
+
+                        Hard ->
+                            ( "Difícil", "6×6" )
+            in
             button
                 [ class "difficulty-option"
                 , classList [ ( "difficulty-option--active", difficulty == model.difficulty ) ]
                 , disabled (isThinking model)
                 , onClick (NewGame difficulty)
                 ]
-                [ text (Api.difficultyLabel difficulty) ]
+                [ span [ class "difficulty-name" ] [ text name ]
+                , span [ class "difficulty-size" ] [ text size ]
+                ]
     in
     div [ class "difficulty-picker" ] (List.map option [ Easy, Medium, Hard ])
 
 
 viewMessages : Model -> Html Msg
 viewMessages model =
-    case model.status of
-        Failed error ->
-            div [ class "message message--error" ]
-                [ span [] [ text error ]
-                , button [ class "message-close", onClick ErrorDismissed ] [ text "✕" ]
-                ]
-
-        Thinking ->
-            div [ class "message message--loading" ]
-                [ span [ class "spinner" ] []
-                , span [] [ text "O Prolog está pensando..." ]
-                ]
-
-        Idle ->
+    let
+        isGameComplete =
             case model.game of
                 Just game ->
-                    if Towers.isComplete game.puzzle game.board then
-                        div [ class "message message--success" ] [ text (completionMessage game.board game.puzzle) ]
-
-                    else
-                        text ""
+                    Towers.isComplete game.puzzle game.board
 
                 Nothing ->
-                    text ""
+                    False
+    in
+    if isGameComplete then
+        case model.game of
+            Just game ->
+                div [ class "message message--success" ]
+                    [ text (completionMessage game.board game.puzzle) ]
+
+            Nothing ->
+                text ""
+
+    else
+        case model.status of
+            Failed error ->
+                div [ class "message message--error" ]
+                    [ span [] [ text error ]
+                    , button [ class "message-close", onClick ErrorDismissed ] [ text "✕" ]
+                    ]
+
+            Thinking ->
+                div [ class "message message--loading" ]
+                    [ span [ class "spinner" ] []
+                    , span [] [ text "O Prolog está pensando..." ]
+                    ]
+
+            HintGiven explanation ->
+                div [ class "message message--info" ]
+                    [ span [] [ text ("Dica: " ++ explanation) ]
+                    , button [ class "message-close", onClick ErrorDismissed ] [ text "✕" ]
+                    ]
+
+            Idle ->
+                text ""
 
 
 completionMessage : Board -> Puzzle -> String
@@ -662,13 +1077,16 @@ viewHeightPad model =
         noSelection =
             Maybe.andThen .selected model.game == Nothing
 
+        inputDisabled =
+            noSelection || boardInputLocked model
+
         maxHeight =
             Maybe.map (.puzzle >> Towers.size) model.game |> Maybe.withDefault 0
 
         heightKey n =
             button
                 [ class "number-key"
-                , disabled noSelection
+                , disabled inputDisabled
                 , onClick (HeightPressed n)
                 ]
                 [ text (String.fromInt n) ]
@@ -676,24 +1094,31 @@ viewHeightPad model =
         marking =
             model.mode == Candidates
     in
-    div [ class "number-pad" ]
-        (List.map heightKey (List.range 1 maxHeight)
-            ++ [ button [ class "erase-key", disabled noSelection, onClick ErasePressed ] [ text "⌫" ]
-               , button
-                    [ class "mode-toggle"
-                    , classList [ ( "mode-toggle--on", marking ) ]
-                    , onClick ModeToggled
-                    ]
-                    [ text
-                        (if marking then
-                            "✎ Anotando"
+    div [ class "height-pad" ]
+        [ div [ class "number-pad" ]
+            (List.map heightKey (List.range 1 maxHeight))
+        , div [ class "pad-actions" ]
+            [ button
+                [ class "erase-key"
+                , disabled inputDisabled
+                , onClick ErasePressed
+                ]
+                [ text "⌫" ]
+            , button
+                [ class "mode-toggle"
+                , classList [ ( "mode-toggle--on", marking ) ]
+                , onClick ModeToggled
+                ]
+                [ text
+                    (if marking then
+                        "✎ Anotando"
 
-                         else
-                            "✎ Candidatos"
-                        )
-                    ]
-               ]
-        )
+                     else
+                        "✎ Candidatos"
+                    )
+                ]
+            ]
+        ]
 
 
 viewActions : Model -> Html Msg
@@ -713,7 +1138,74 @@ viewActions model =
     div [ class "actions" ]
         [ button [ class "action-button action-button--hint", disabled nothingToAsk, onClick HintRequested ] [ text "Dica" ]
         , button [ class "action-button action-button--solve", disabled nothingToAsk, onClick SolveRequested ] [ text "Resolver" ]
-        , button [ class "action-button action-button--reset", disabled (isThinking model), onClick ResetRequested ] [ text "Limpar" ]
+        , button [ class "action-button action-button--reset", disabled (boardInputLocked model), onClick ResetRequested ] [ text "Limpar" ]
+        ]
+
+
+viewHistoryControls : Model -> Html Msg
+viewHistoryControls model =
+    let
+        ( canUndo, canRedo ) =
+            case model.game of
+                Just game ->
+                    ( not (List.isEmpty game.history.past)
+                    , not (List.isEmpty game.history.future)
+                    )
+
+                Nothing ->
+                    ( False, False )
+    in
+    div [ class "history-controls" ]
+        [ button
+            [ class "history-button"
+            , disabled (boardInputLocked model || not canUndo)
+            , onClick UndoPressed
+            , attribute "title" "Desfazer (⌘Z no Mac; Ctrl+Z no Windows/Linux)"
+            ]
+            [ undoIcon, text "Desfazer" ]
+        , button
+            [ class "history-button"
+            , disabled (boardInputLocked model || not canRedo)
+            , onClick RedoPressed
+            , attribute "title" "Refazer (⌘⇧Z no Mac; Ctrl+Y no Windows/Linux)"
+            ]
+            [ redoIcon, text "Refazer" ]
+        ]
+
+
+undoIcon : Html Msg
+undoIcon =
+    svg
+        [ SvgAttr.viewBox "0 0 24 24"
+        , SvgAttr.width "18"
+        , SvgAttr.height "18"
+        , SvgAttr.fill "none"
+        , SvgAttr.stroke "currentColor"
+        , SvgAttr.strokeWidth "2"
+        , SvgAttr.strokeLinecap "round"
+        , SvgAttr.strokeLinejoin "round"
+        , attribute "aria-hidden" "true"
+        ]
+        [ path [ SvgAttr.d "M3 7v6h6" ] []
+        , path [ SvgAttr.d "M21 17a9 9 0 0 0-15-6.7L3 13" ] []
+        ]
+
+
+redoIcon : Html Msg
+redoIcon =
+    svg
+        [ SvgAttr.viewBox "0 0 24 24"
+        , SvgAttr.width "18"
+        , SvgAttr.height "18"
+        , SvgAttr.fill "none"
+        , SvgAttr.stroke "currentColor"
+        , SvgAttr.strokeWidth "2"
+        , SvgAttr.strokeLinecap "round"
+        , SvgAttr.strokeLinejoin "round"
+        , attribute "aria-hidden" "true"
+        ]
+        [ path [ SvgAttr.d "M21 7v6h-6" ] []
+        , path [ SvgAttr.d "M3 17a9 9 0 0 1 15-6.7L21 13" ] []
         ]
 
 
@@ -728,3 +1220,142 @@ viewRules =
             ]
         , p [] [ text "Números na borda ficam verdes quando a linha cumpre a pista e vermelhos quando não cumpre." ]
         ]
+
+
+viewStatistics : Model -> Html Msg
+viewStatistics model =
+    case model.game of
+        Just game ->
+            let
+                best =
+                    Statistics.bestTimeFor game.difficulty model.bestTimes
+                        |> Maybe.map Statistics.formatTime
+                        |> Maybe.withDefault "—"
+            in
+            div [ class "game-stats" ]
+                [ p [ class "game-stat" ]
+                    [ span [] [ text "Tempo" ]
+                    , span [] [ text (Statistics.formatTime game.elapsedSeconds) ]
+                    ]
+                , p [ class "game-stat" ]
+                    [ span [] [ text "Dicas usadas" ]
+                    , span [] [ text (String.fromInt game.hintsUsed) ]
+                    ]
+                , p [ class "game-stat" ]
+                    [ span [] [ text "Recorde sem ajuda" ]
+                    , span [] [ text best ]
+                    ]
+                ]
+
+        Nothing ->
+            text ""
+
+
+viewVictoryModal : Model -> Html Msg
+viewVictoryModal model =
+    if not model.showVictoryModal then
+        text ""
+
+    else
+        case model.game of
+            Just game ->
+                let
+                    isRecord =
+                        game.newRecord
+
+                    ( title, subtitle, icon ) =
+                        if game.solverUsed then
+                            ( "Cidade Concluída com Ajuda"
+                            , "O Prolog encontrou a solução para você. Que tal tentar resolver sozinho agora?"
+                            , "🏙️"
+                            )
+
+                        else if game.hintsUsed > 0 then
+                            ( "Cidade Concluída com Dicas"
+                            , "Você usou "
+                                ++ String.fromInt game.hintsUsed
+                                ++ (if game.hintsUsed == 1 then
+                                        " dica para encontrar as alturas. Mandou bem!"
+
+                                    else
+                                        " dicas para encontrar as alturas. Mandou bem!"
+                                   )
+                            , "💡"
+                            )
+
+                        else
+                            ( "Parabéns! Cidade Erguida!"
+                            , "Você deduziu com perfeição a altura de todas as torres!"
+                            , "🎉"
+                            )
+                in
+                div [ class "modal-overlay" ]
+                    [ div [ class "modal-backdrop", onClick VictoryModalDismissed ] []
+                    , div [ class "modal-dialog victory-dialog" ]
+                        [ button
+                            [ class "modal-close"
+                            , attribute "aria-label" "Fechar modal e ver tabuleiro"
+                            , onClick VictoryModalDismissed
+                            ]
+                            [ text "✕" ]
+                        , div [ class "victory-header" ]
+                            [ span [ class "victory-icon" ] [ text icon ]
+                            , h2 [ class "victory-title" ] [ text title ]
+                            , p [ class "victory-subtitle" ] [ text subtitle ]
+                            ]
+                        , if isRecord then
+                            div [ class "victory-record-badge" ]
+                                [ text "🏆 Novo Recorde Pessoal!" ]
+
+                          else
+                            text ""
+                        , div [ class "victory-stats-grid" ]
+                            [ div [ class "victory-stat-card" ]
+                                [ span [ class "victory-stat-label" ] [ text "Tempo" ]
+                                , span [ class "victory-stat-value" ] [ text (Statistics.formatTime game.elapsedSeconds) ]
+                                ]
+                            , div [ class "victory-stat-card" ]
+                                [ span [ class "victory-stat-label" ] [ text "Dificuldade" ]
+                                , span [ class "victory-stat-value" ] [ text (Api.difficultyLabel game.difficulty) ]
+                                ]
+                            , div [ class "victory-stat-card" ]
+                                [ span [ class "victory-stat-label" ] [ text "Dicas Usadas" ]
+                                , span [ class "victory-stat-value" ]
+                                    [ text
+                                        (if game.hintsUsed == 0 then
+                                            "0 (Sem dicas)"
+
+                                         else
+                                            String.fromInt game.hintsUsed
+                                        )
+                                    ]
+                                ]
+                            , div [ class "victory-stat-card" ]
+                                [ span [ class "victory-stat-label" ] [ text "Auxílio Solver" ]
+                                , span [ class "victory-stat-value" ]
+                                    [ text
+                                        (if game.solverUsed then
+                                            "Sim"
+
+                                         else
+                                            "Não"
+                                        )
+                                    ]
+                                ]
+                            ]
+                        , div [ class "victory-new-game" ]
+                            [ span [ class "victory-new-game-label" ] [ text "Escolha a dificuldade do próximo jogo" ]
+                            , viewDifficulty model
+                            ]
+                        , div [ class "victory-actions" ]
+                            [ button
+                                [ class "btn btn-secondary victory-btn"
+                                , onClick VictoryModalDismissed
+                                ]
+                                [ text "Ver Tabuleiro" ]
+                            ]
+                        ]
+                    ]
+
+            Nothing ->
+                text ""
