@@ -67,8 +67,7 @@
 
    Fontes "variáveis" permitem ajustar peso, largura etc. de forma contínua
    (qualquer peso entre 100 e 900, por exemplo), com um único arquivo. */
-@import "@fontsource-variable/fraunces/full.css"; /* título */
-@import "@fontsource-variable/outfit";            /* interface e números */
+/* Visual retrô: usamos só fontes monoespaçadas que já vêm no sistema. */
 
 /* O Tailwind só gera as classes utilitárias que encontra no código-fonte. */
 @source "./**/*.elm";
@@ -122,35 +121,36 @@
   prefersdark: false;
   color-scheme: light;
 
-  --color-base-100: oklch(99% 0.01 80);    /* papel */
-  --color-base-200: oklch(96% 0.02 80);
-  --color-base-300: oklch(90% 0.03 75);
-  --color-base-content: oklch(28% 0.04 265); /* tinta */
-  --color-primary: oklch(55% 0.2 275);     /* anil: seleção */
-  --color-primary-content: oklch(98% 0.01 275);
-  --color-secondary: oklch(68% 0.19 20);   /* coral: dica */
-  --color-secondary-content: oklch(99% 0.01 20);
-  --color-accent: oklch(78% 0.15 75);      /* âmbar: destaques */
-  --color-accent-content: oklch(28% 0.05 75);
-  --color-neutral: oklch(32% 0.04 265);
-  --color-neutral-content: oklch(97% 0.01 265);
-  --color-info: oklch(52% 0.17 250);       /* números do jogador */
-  --color-info-content: oklch(98% 0.01 250);
-  --color-success: oklch(58% 0.14 160);    /* números revelados */
-  --color-success-content: oklch(98% 0.01 160);
-  --color-warning: oklch(76% 0.16 65);     /* modo de marcação */
-  --color-warning-content: oklch(28% 0.06 65);
-  --color-error: oklch(58% 0.21 25);       /* conflitos */
-  --color-error-content: oklch(98% 0.01 25);
+  /* Paleta retrô: vermelho, branco e cinza. */
+  --color-base-100: oklch(99% 0 0);        /* branco: painéis e tabuleiro */
+  --color-base-200: oklch(91% 0 0);        /* cinza claro: fundo da página */
+  --color-base-300: oklch(80% 0 0);
+  --color-base-content: oklch(24% 0 0);    /* grafite: "tinta" e contornos */
+  --color-primary: oklch(55% 0.22 27);     /* vermelho: seleção, destaques */
+  --color-primary-content: oklch(99% 0 0);
+  --color-secondary: oklch(45% 0.19 27);   /* vermelho escuro: dica */
+  --color-secondary-content: oklch(99% 0 0);
+  --color-accent: oklch(72% 0 0);          /* cinza médio: resolver, mesma altura */
+  --color-accent-content: oklch(24% 0 0);
+  --color-neutral: oklch(30% 0 0);
+  --color-neutral-content: oklch(97% 0 0);
+  --color-info: oklch(45% 0 0);            /* cinza: mensagens de dica */
+  --color-info-content: oklch(99% 0 0);
+  --color-success: oklch(38% 0 0);         /* cinza escuro: pista cumprida */
+  --color-success-content: oklch(99% 0 0);
+  --color-warning: oklch(35% 0 0);         /* modo de anotação */
+  --color-warning-content: oklch(99% 0 0);
+  --color-error: oklch(50% 0.23 27);       /* vermelho: conflitos */
+  --color-error-content: oklch(99% 0 0);
 
-  /* Arredondamento e "profundidade" dos componentes do daisyUI. */
-  --radius-selector: 1rem;
-  --radius-field: 0.75rem;
-  --radius-box: 1.25rem;
+  /* Retrô: cantos retos, bordas firmes e nenhuma "profundidade" suave. */
+  --radius-selector: 0;
+  --radius-field: 0;
+  --radius-box: 0;
   --size-selector: 0.25rem;
   --size-field: 0.25rem;
-  --border: 1px;
-  --depth: 1;
+  --border: 2px;
+  --depth: 0;
   --noise: 0;
 }
 
@@ -163,34 +163,34 @@
   prefersdark: false;
   color-scheme: dark;
 
-  --color-base-100: oklch(22% 0.03 270);
-  --color-base-200: oklch(18% 0.03 270);
-  --color-base-300: oklch(30% 0.04 270);
-  --color-base-content: oklch(92% 0.02 270);
-  --color-primary: oklch(68% 0.18 280);
-  --color-primary-content: oklch(15% 0.04 280);
-  --color-secondary: oklch(72% 0.17 15);
-  --color-secondary-content: oklch(15% 0.04 15);
-  --color-accent: oklch(82% 0.14 80);
-  --color-accent-content: oklch(20% 0.04 80);
-  --color-neutral: oklch(30% 0.03 270);
-  --color-neutral-content: oklch(92% 0.02 270);
-  --color-info: oklch(78% 0.12 230);
-  --color-info-content: oklch(18% 0.04 230);
-  --color-success: oklch(78% 0.14 160);
-  --color-success-content: oklch(18% 0.04 160);
-  --color-warning: oklch(80% 0.15 70);
-  --color-warning-content: oklch(20% 0.05 70);
-  --color-error: oklch(68% 0.2 22);
-  --color-error-content: oklch(15% 0.04 22);
+  --color-base-100: oklch(25% 0 0);
+  --color-base-200: oklch(17% 0 0);
+  --color-base-300: oklch(34% 0 0);
+  --color-base-content: oklch(94% 0 0);
+  --color-primary: oklch(63% 0.22 27);
+  --color-primary-content: oklch(99% 0 0);
+  --color-secondary: oklch(55% 0.19 27);
+  --color-secondary-content: oklch(99% 0 0);
+  --color-accent: oklch(48% 0 0);
+  --color-accent-content: oklch(97% 0 0);
+  --color-neutral: oklch(32% 0 0);
+  --color-neutral-content: oklch(94% 0 0);
+  --color-info: oklch(75% 0 0);
+  --color-info-content: oklch(18% 0 0);
+  --color-success: oklch(82% 0 0);
+  --color-success-content: oklch(18% 0 0);
+  --color-warning: oklch(86% 0 0);
+  --color-warning-content: oklch(18% 0 0);
+  --color-error: oklch(66% 0.22 27);
+  --color-error-content: oklch(15% 0 0);
 
-  --radius-selector: 1rem;
-  --radius-field: 0.75rem;
-  --radius-box: 1.25rem;
+  --radius-selector: 0;
+  --radius-field: 0;
+  --radius-box: 0;
   --size-selector: 0.25rem;
   --size-field: 0.25rem;
-  --border: 1px;
-  --depth: 1;
+  --border: 2px;
+  --depth: 0;
   --noise: 0;
 }
 
@@ -204,8 +204,8 @@
    ========================================================================== */
 
 @theme {
-  --font-sans: "Outfit Variable", ui-sans-serif, system-ui, sans-serif;
-  --font-display: "Fraunces Variable", ui-serif, Georgia, serif;
+  --font-sans: "Courier New", "Lucida Console", ui-monospace, "DejaVu Sans Mono", monospace;
+  --font-display: "Courier New", "Lucida Console", ui-monospace, "DejaVu Sans Mono", monospace;
 }
 
 
@@ -229,10 +229,10 @@
      (pista, jogador, Prolog) é indicada só por peso, cor e fundo. Fontes
      variáveis aceitam qualquer peso de 100 a 900, não só 400 e 700. */
   --font-numbers: var(--font-sans);
-  --given-weight: 700;     /* pistas: firmes */
-  --guess-weight: 400;     /* jogador: mais leve */
-  --revealed-weight: 300;  /* Prolog: fino */
-  --marks-weight: 500;
+  --given-weight: 700;     /* pistas: negrito */
+  --guess-weight: 700;     /* jogador: a cor (vermelha) já diferencia */
+  --revealed-weight: 400;  /* Prolog: normal, em cinza */
+  --marks-weight: 700;
 
   /* --- Layout --- */
   --panel-width: 18rem;  /* painel lateral (telas largas) */
@@ -245,46 +245,42 @@
      `calc()`. Se usasse 94vw, o tabuleiro somado ao padding passaria da
      largura da tela nos celulares. */
   --board-size: min(100vw - 2rem, 32rem, 70vh);
-  --board-radius: 1.25rem;
-  --board-line-thin: 1px;
-  --board-line-thick: 3px;
-  --board-line-color: color-mix(in oklch, var(--color-base-content) 16%, transparent);
-  --board-box-color: color-mix(in oklch, var(--color-base-content) 70%, transparent);
-  --board-shadow:
-    0 1px 2px color-mix(in oklch, var(--color-base-content) 10%, transparent),
-    0 24px 48px -12px color-mix(in oklch, var(--color-primary) 35%, transparent);
+  --board-radius: 0;
+  --board-line-thin: 2px;
+  --board-line-thick: 4px;
+  --board-line-color: color-mix(in oklch, var(--color-base-content) 30%, transparent);
+  --board-box-color: var(--color-base-content);
+  /* Sombra "dura": um bloco vermelho deslocado, sem desfoque. */
+  --board-shadow: 8px 8px 0 var(--color-primary);
 
   /* --- Cores de estado das casas --- */
   --cell-bg: transparent;
-  --cell-hover: color-mix(in oklch, var(--color-primary) 10%, transparent);
-  --cell-related: color-mix(in oklch, var(--color-primary) 7%, transparent);
-  --cell-same-value: color-mix(in oklch, var(--color-accent) 35%, transparent);
+  --cell-hover: color-mix(in oklch, var(--color-base-content) 10%, transparent);
+  --cell-related: color-mix(in oklch, var(--color-base-content) 7%, transparent);
+  --cell-same-value: color-mix(in oklch, var(--color-accent) 55%, transparent);
   --cell-selected: var(--color-primary);
   --cell-conflict: var(--color-error);
   --given-color: var(--color-base-content);
-  --guess-color: var(--color-info);
-  --revealed-color: var(--color-success);
+  --guess-color: var(--color-primary);
+  --revealed-color: color-mix(in oklch, var(--color-base-content) 55%, var(--color-base-100));
 
   /* Fundo que indica a origem do número. Fica numa camada própria
      (background-image), por cima da cor de estado (background-color), e por
      isso convive com os destaques de linha, coluna e mesmo número. */
-  --given-tint: color-mix(in oklch, var(--color-base-content) 7%, transparent);
-  --guess-tint: color-mix(in oklch, var(--color-info) 11%, transparent);
-  --revealed-tint: color-mix(in oklch, var(--color-success) 11%, transparent);
+  --given-tint: color-mix(in oklch, var(--color-base-content) 9%, transparent);
+  --guess-tint: color-mix(in oklch, var(--color-primary) 9%, transparent);
+  --revealed-tint: color-mix(in oklch, var(--color-base-content) 16%, transparent);
 
   /* --- Fundo da página --- */
   /* Vários gradientes radiais sobrepostos formam um "mesh gradient". */
-  --page-gradient:
-    radial-gradient(60rem 40rem at 10% -10%, color-mix(in oklch, var(--color-primary) 22%, transparent), transparent 70%),
-    radial-gradient(50rem 40rem at 110% 10%, color-mix(in oklch, var(--color-secondary) 18%, transparent), transparent 70%),
-    radial-gradient(60rem 50rem at 50% 120%, color-mix(in oklch, var(--color-accent) 22%, transparent), transparent 70%);
-  --texture-opacity: 0.35;  /* granulado sobre o fundo; 0 desliga */
-  --dot-grid-opacity: 0.5;  /* grade de pontinhos; 0 desliga */
+  --page-gradient: none;    /* retrô: fundo chapado, sem degradê */
+  --texture-opacity: 0;     /* sem granulado */
+  --dot-grid-opacity: 1;    /* linhas de varredura (estilo CRT); 0 desliga */
 
   /* --- Efeito vidro (glassmorphism) dos painéis --- */
-  --glass-bg: color-mix(in oklch, var(--color-base-100) 72%, transparent);
-  --glass-border: color-mix(in oklch, var(--color-base-content) 10%, transparent);
-  --glass-blur: 16px;
+  --glass-bg: var(--color-base-100);   /* retrô: sem transparência */
+  --glass-border: var(--color-base-content);
+  --glass-blur: 0px;
 
   /* --- Movimento --- */
   --speed: 1;  /* 2 = animações duas vezes mais lentas; 0.5 = mais rápidas */
@@ -295,8 +291,7 @@
    quem ativar o tema com `data-theme="dark"` no <html>. */
 :root:has(.theme-controller[value="dark"]:checked),
 [data-theme="dark"] {
-  --texture-opacity: 0.2;
-  --board-box-color: color-mix(in oklch, var(--color-base-content) 55%, transparent);
+  --board-line-color: color-mix(in oklch, var(--color-base-content) 25%, transparent);
 }
 
 
@@ -330,9 +325,7 @@
     background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='220' height='220'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
   }
 
-  /* Grade de pontinhos, como papel de caderno quadriculado. Um único
-     gradiente radial minúsculo repetido a cada 24px. `mask-image` faz a
-     grade sumir suavemente nas bordas da tela. */
+  /* Linhas de varredura de um monitor CRT: uma listra fina a cada 4px. */
   body::after {
     content: "";
     position: fixed;
@@ -340,13 +333,16 @@
     z-index: -1;
     pointer-events: none;
     opacity: var(--dot-grid-opacity);
-    background-image: radial-gradient(color-mix(in oklch, var(--color-base-content) 18%, transparent) 1px, transparent 1.5px);
-    background-size: 24px 24px;
-    mask-image: radial-gradient(ellipse at center, black 30%, transparent 75%);
+    background-image: repeating-linear-gradient(
+      0deg,
+      transparent 0 3px,
+      color-mix(in oklch, var(--color-base-content) 6%, transparent) 3px 4px
+    );
   }
 
   ::selection {
-    background: color-mix(in oklch, var(--color-accent) 60%, transparent);
+    background: var(--color-primary);
+    color: var(--color-primary-content);
   }
 }
 
@@ -726,7 +722,7 @@
     animation: pop calc(220ms * var(--speed)) ease-out;
   }
   .cell--revealed .cell-value {
-    animation: reveal calc(500ms * var(--speed)) ease-out;
+    animation: reveal calc(500ms * var(--speed)) steps(5);
   }
 
   /* ---------- Pontos entre casas vizinhas ----------
@@ -921,8 +917,7 @@
   }
 
   .victory-record-badge {
-    @apply inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold tracking-wide uppercase bg-amber-500/20 text-amber-300 border border-amber-500/40;
-    animation: badge-glow 2s ease-in-out infinite alternate;
+    @apply inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold tracking-wide uppercase border;
   }
 
   .victory-stats-grid {
@@ -957,6 +952,228 @@
   .victory-btn {
     @apply flex-1 py-3 text-sm font-semibold rounded-xl;
   }
+
+
+  /* ==========================================================================
+     TEMA RETRÔ (arcade, anos 80)
+     Fica por último na camada de componentes para vencer as regras acima,
+     que têm a mesma especificidade. Receita: cantos retos, contornos de 2 a
+     4px na cor da tinta, sombras duras (sem desfoque) e texto em caixa alta.
+     ========================================================================== */
+
+  /* Cabeçalho: barra vermelha com listras branca e cinza embaixo. */
+  .app-header {
+    background: var(--color-primary);
+    backdrop-filter: none;
+    border-bottom: 4px solid var(--color-base-content);
+    box-shadow:
+      0 6px 0 var(--color-base-100),
+      0 12px 0 var(--color-base-300);
+  }
+
+  .app-title {
+    @apply text-2xl uppercase;
+    font-weight: 700;
+    font-variation-settings: normal;
+    background: none;
+    color: var(--color-primary-content);
+    /* Mesmo tratamento dos botões (negrito, caixa alta, espaçamento de
+       0.06em), só em tamanho maior: sem sombra e sem inclinação. */
+    letter-spacing: 0.06em;
+    white-space: nowrap;
+    flex-shrink: 0;
+  }
+
+  .app-header-content {
+    flex-wrap: wrap;
+    align-items: center;
+    row-gap: 0.5rem;
+  }
+
+  .app-subtitle {
+    @apply text-xs uppercase;
+    border-radius: 0;
+    border: 2px solid var(--color-base-content);
+    background: var(--color-base-100);
+    color: var(--color-base-content);
+    letter-spacing: 0.1em;
+  }
+
+  /* Painel lateral: papel branco, contorno grafite e sombra cinza dura. */
+  .side-panel {
+    backdrop-filter: none;
+    border: 3px solid var(--color-base-content);
+    box-shadow: 6px 6px 0 var(--color-secondary);
+  }
+
+  .panel-label {
+    @apply text-xs font-bold tracking-widest uppercase;
+    opacity: 1;
+    color: var(--color-base-content);
+
+    &::before {
+      content: "■ ";
+      color: var(--color-primary);
+    }
+  }
+
+  .game-stat {
+    border-bottom: 2px dotted color-mix(in oklch, var(--color-base-content) 35%, transparent);
+  }
+
+  /* Botões: bloco com contorno e sombra dura que "afunda" ao apertar. */
+  :is(
+    .difficulty-option, .number-key, .erase-key, .mode-toggle,
+    .action-button, .history-button, .victory-btn, .theme-toggle,
+    .modal-close, .message-close
+  ) {
+    border: 2px solid var(--color-base-content);
+    border-radius: 0;
+    box-shadow: 3px 3px 0 var(--color-base-content);
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    font-weight: 700;
+    transition: transform calc(60ms * var(--speed)) steps(2),
+                box-shadow calc(60ms * var(--speed)) steps(2);
+
+    &:hover:not(:disabled) {
+      transform: translate(-1px, -1px);
+      box-shadow: 4px 4px 0 var(--color-base-content);
+    }
+    &:active:not(:disabled) {
+      transform: translate(3px, 3px);
+      box-shadow: 0 0 0 var(--color-base-content);
+    }
+    &:disabled {
+      box-shadow: none;
+      opacity: 0.45;
+    }
+  }
+
+  /* Rótulos longos precisam caber nos botões da coluna lateral. */
+  :is(.action-button, .mode-toggle, .history-button) {
+    font-size: 0.8rem;
+    letter-spacing: 0.02em;
+    padding-inline: 0.4rem;
+  }
+
+  /* Conflito: as casas já ficam listradas; sem halo rosado no tabuleiro. */
+  .board:has(.cell--conflict) {
+    box-shadow: var(--board-shadow);
+  }
+
+  .number-key {
+    background: var(--color-base-100);
+    color: var(--color-base-content);
+    font-weight: 700;
+
+    &:hover:not(:disabled) {
+      background: var(--color-base-200);
+    }
+  }
+  [data-mode="marks"] .number-key {
+    background: var(--color-base-200);
+  }
+
+  /* Dificuldade: três blocos separados em vez de um grupo colado. */
+  .difficulty-picker {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 0.5rem;
+  }
+  .difficulty-picker > .difficulty-option {
+    margin: 0;
+    border-radius: 0;
+    background: var(--color-base-100);
+    color: var(--color-base-content);
+
+    &.difficulty-option--active {
+      background: var(--color-primary);
+      color: var(--color-primary-content);
+    }
+  }
+  .difficulty-name { font-weight: 700; }
+
+  .theme-toggle {
+    background: var(--color-base-100);
+    color: var(--color-base-content);
+  }
+
+  .history-button:disabled { opacity: 0.45; }
+
+  /* Pistas da borda: cumprida = bloco cinza escuro; errada = bloco vermelho.
+     Assim a diferença não depende só de enxergar verde e vermelho. */
+  .clue--ok,
+  .clue--wrong {
+    margin: 12%;
+    font-weight: 700;
+  }
+  .clue--ok {
+    background: var(--color-success);
+    color: var(--color-success-content);
+  }
+  .clue--wrong {
+    background: var(--color-error);
+    color: var(--color-error-content);
+  }
+
+  .cell--conflict {
+    background-image: repeating-linear-gradient(
+      -45deg,
+      color-mix(in oklch, var(--cell-conflict) 30%, transparent) 0 4px,
+      transparent 4px 9px
+    );
+  }
+
+  .corner-mark--highlight {
+    border-radius: 0;
+  }
+
+  /* Mensagens */
+  .message {
+    border: 2px solid var(--color-base-content);
+    box-shadow: 3px 3px 0 var(--color-base-content);
+    font-weight: 700;
+  }
+
+  /* Modal de vitória */
+  .modal-backdrop {
+    backdrop-filter: none;
+    background: color-mix(in oklch, var(--color-base-content) 75%, transparent);
+  }
+
+  .victory-dialog {
+    border-radius: 0;
+    backdrop-filter: none;
+    border: 4px solid var(--color-base-content);
+    box-shadow: 8px 8px 0 var(--color-primary);
+  }
+
+  .victory-title {
+    @apply uppercase;
+    font-family: var(--font-title);
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    color: var(--color-primary);
+  }
+
+  .victory-record-badge {
+    border-radius: 0;
+    background: var(--color-primary);
+    color: var(--color-primary-content);
+    border: 2px solid var(--color-base-content);
+    animation: badge-blink 1s steps(2) infinite;
+  }
+
+  .victory-stat-card {
+    border-radius: 0;
+    background: var(--color-base-200);
+    border: 2px solid var(--color-base-content);
+  }
+
+  .victory-new-game-label {
+    opacity: 1;
+  }
 }
 
 
@@ -983,8 +1200,8 @@
 }
 
 @keyframes reveal {
-  0%   { filter: blur(6px); opacity: 0; transform: translateY(20%); }
-  100% { filter: blur(0); opacity: 1; transform: none; }
+  0%   { opacity: 0; transform: translateY(20%); }
+  100% { opacity: 1; transform: none; }
 }
 
 @keyframes modal-pop {
@@ -1008,9 +1225,8 @@
   to { transform: translateY(-8px) scale(1.1); }
 }
 
-@keyframes badge-glow {
-  from { box-shadow: 0 0 4px rgba(245, 158, 11, 0.2); }
-  to { box-shadow: 0 0 16px rgba(245, 158, 11, 0.6); }
+@keyframes badge-blink {
+  50% { opacity: 0.6; }
 }
 
 /* Quem configurou o sistema para "reduzir movimento" não vê animações. */
