@@ -4,6 +4,9 @@ module Statistics exposing
     , elapsedSeconds
     , formatTime
     , recordIfEligible
+    , MatchStats
+    , initMatchStats
+    , recordMatch
     )
 
 import Api exposing (Difficulty(..))
@@ -17,6 +20,31 @@ type alias BestTimes =
     { easy : Maybe Int
     , medium : Maybe Int
     , hard : Maybe Int
+    }
+
+
+type alias MatchStats =
+    { gamesPlayed : Int
+    , wins : Int
+    }
+
+initMatchStats : MatchStats
+initMatchStats =
+    { gamesPlayed = 0
+    , wins = 0
+    }
+
+
+recordMatch : Bool -> MatchStats -> MatchStats
+recordMatch won stats =
+    { stats
+        | gamesPlayed = stats.gamesPlayed + 1
+        , wins =
+            if won then
+                stats.wins + 1
+
+            else
+                stats.wins
     }
 
 

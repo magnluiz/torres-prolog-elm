@@ -63,6 +63,7 @@ type alias Model =
     , darkTheme : Bool
     , bestTimes : Statistics.BestTimes
     , showVictoryModal : Bool
+    , matchStats : Statistics.MatchStats
     }
 
 
@@ -124,6 +125,7 @@ init flags =
       , darkTheme = flags.darkTheme
       , bestTimes = flags.bestTimes
       , showVictoryModal = False
+      , matchStats = Statistics.initMatchStats
       }
     , Api.generate Medium GotPuzzle
     )
@@ -414,12 +416,19 @@ finishGame now model =
                             newRecord =
                                 updatedRecords /= model.bestTimes
 
+                            isWin =
+                                not game.solverUsed
+
+                            updatedMatchStats =
+                                Statistics.recordMatch isWin model.matchStats
+
                             finishedGame =
                                 { game | finished = True, newRecord = newRecord }
 
                             finishedModel =
                                 { model
                                     | game = Just finishedGame
+                                    , matchStats = updatedMatchStats
                                     , status = Idle
                                     , showVictoryModal = True
                                 }
@@ -1244,6 +1253,14 @@ viewStatistics model =
                 , p [ class "game-stat" ]
                     [ span [] [ text "Recorde sem ajuda" ]
                     , span [] [ text best ]
+                    ]
+                , p [ class "game-stat" ]
+                    [ span [] [ text "Partidas jogadas" ]
+                    , span [] [ text (String.fromInt model.matchStats.gamesPlayed) ]
+                    ]
+                , p [ class "game-stat" ]
+                    [ span [] [ text "Vitórias" ]
+                    , span [] [ text (String.fromInt model.matchStats.wins) ]
                     ]
                 ]
 
