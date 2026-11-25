@@ -21,7 +21,7 @@
     existentes), não o conteúdo. Corrija todos os ERROS apontados.
 -->
 
-# [Nome do projeto]
+# Torres Latinas
 
 ## 1. Identificação
 
@@ -34,20 +34,18 @@
 
 | Nome completo | Matrícula | Turma (14h/16h) | Usuário GitHub |
 |---------------|-----------|-----------------|----------------|
-| [Nome]        | [000000]  | [14h]           | [@usuario]     |
-| [Nome]        | [000000]  | [16h]           | [@usuario]     |
-| [Nome]        | [000000]  | [14h]           | [@usuario]     |
-| [Nome]        | [000000]  | [16h]           | [@usuario]     |
-| [Nome]        | [000000]  | [14h]           | [@usuario]     |
+| Magno Luiz Vale Vieira          | 180042696 | 16h | @magnluiz        |
+| Maciel Ferreira Custodio Junior | 190100087 | 16h | @macieljuniormax |
+| Eduardo Belarmino Silva         | 221008580 | 16h | @eduard0803      |
 
-- **Nome do projeto:** [o mesmo do título acima]
-- **Nome do grupo:** [um nome criativo, que não se repita na turma]
+- **Nome do projeto:** Torres Latinas
+- **Nome do grupo:** Torres Latinas
   <!--
     O nome do grupo identifica vocês nas planilhas de notas e na chamada
     para a apresentação. Não dá para validar se é único, então caprichem:
     "Grupo 3" vai colidir com o "Grupo 3" da outra turma.
   -->
-- **Repositório:** [https://github.com/...]
+- **Repositório:** [torres-prolog-elm](https://github.com/magnluiz/torres-prolog-elm)
 - **Commit ou tag entregue:** [`a1b2c3d` ou `v1.0`]
   <!--
     O avaliador vai olhar exatamente esta versão. Para criar uma tag:
@@ -72,9 +70,11 @@
   Prolog resolve nele. Quem ler só esta seção deve entender o projeto.
 -->
 
+O Torres Latinas é um jogo de lógica executado no navegador, voltado para pessoas que gostam de desafios e quebra-cabeças. O objetivo é preencher uma grade com alturas de prédios, respeitando as regras de quadrado latino, visibilidade e pontos entre casas vizinhas. O Prolog é responsável por representar as regras como restrições lógicas, gerar puzzles com solução única, resolver tabuleiros e fornecer dicas ao jogador. A interface é desenvolvida em Elm, enquanto o Python realiza a comunicação entre o frontend e o Prolog.
+
 [Resumo do projeto.]
 
-![Captura de tela do sistema](docs/captura.png)
+![Captura de tela do sistema](docs/torres-latinas.png)
 <!-- Uma ou duas capturas de tela da interface. Crie a pasta docs/ se precisar. -->
 
 ## 3. Como executar
@@ -87,20 +87,21 @@
 
 **Requisitos** (com as versões que o grupo usou):
 
-- SWI-Prolog [9.x]
-- Node.js [2x.x]
-- [uv / Python 3.x, se usar]
+- SWI-Prolog [11.0.0]
+- Node.js [20.20.0]
+- [uv / Python 3.10.12, se usar]
 
 **Instalação e execução:**
 
 ```sh
-[comandos exatos, na ordem]
+make install
+make dev
 ```
 
 **Testes:**
 
 ```sh
-[comando para rodar os testes, se houver]
+make test
 ```
 
 **Testado em:** [Linux / Windows / macOS, navegador]
