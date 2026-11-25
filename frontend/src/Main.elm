@@ -29,6 +29,9 @@ import Towers exposing (Board, Cell(..), Clue(..), ClueStatus(..), Position, Puz
 port saveBestTimes : Encode.Value -> Cmd msg
 
 
+port saveMatchStats : Encode.Value -> Cmd msg
+
+
 
 -- MAIN
 
@@ -52,6 +55,7 @@ main =
 type alias Flags =
     { darkTheme : Bool
     , bestTimes : Statistics.BestTimes
+    , matchStats : Statistics.MatchStats
     }
 
 
@@ -125,7 +129,7 @@ init flags =
       , darkTheme = flags.darkTheme
       , bestTimes = flags.bestTimes
       , showVictoryModal = False
-      , matchStats = Statistics.initMatchStats
+      , matchStats = flags.matchStats
       }
     , Api.generate Medium GotPuzzle
     )
@@ -432,9 +436,12 @@ finishGame now model =
                                     , status = Idle
                                     , showVictoryModal = True
                                 }
+
+                            statsCmd =
+                                saveMatchStats (encodeMatchStats updatedMatchStats)
                         in
                         if updatedRecords == model.bestTimes then
-                            ( finishedModel, Cmd.none )
+                            ( finishedModel, statsCmd )
 
                         else
                             let
@@ -442,7 +449,10 @@ finishGame now model =
                                     { finishedModel | bestTimes = updatedRecords }
                             in
                             ( modelWithRecord
-                            , saveBestTimes (encodeBestTimes updatedRecords)
+                            , Cmd.batch
+                                [ saveBestTimes (encodeBestTimes updatedRecords)
+                                , statsCmd
+                                ]
                             )
 
                 Nothing ->
@@ -450,6 +460,14 @@ finishGame now model =
 
         Nothing ->
             ( model, Cmd.none )
+
+
+encodeMatchStats : Statistics.MatchStats -> Encode.Value
+encodeMatchStats stats =
+    Encode.object
+        [ ( "gamesPlayed", Encode.int stats.gamesPlayed )
+        , ( "wins", Encode.int stats.wins )
+        ]
 
 
 encodeBestTimes : Statistics.BestTimes -> Encode.Value
