@@ -32,11 +32,11 @@
   indique a turma de CADA integrante.
 -->
 
-| Nome completo | Matrícula | Turma (14h/16h) | Usuário GitHub |
-|---------------|-----------|-----------------|----------------|
-| Magno Luiz Vale Vieira          | 180042696 | 16h | @magnluiz        |
-| Maciel Ferreira Custodio Junior | 190100087 | 16h | @macieljuniormax |
-| Eduardo Belarmino Silva         | 221008580 | 16h | @eduard0803      |
+| Nome completo                   | Matrícula | Turma (14h/16h) | Usuário GitHub   |
+| ------------------------------- | --------- | --------------- | ---------------- |
+| Magno Luiz Vale Vieira          | 180042696 | 16h             | @magnluiz        |
+| Maciel Ferreira Custodio Junior | 190100087 | 16h             | @macieljuniormax |
+| Eduardo Belarmino Silva         | 221008580 | 16h             | @eduard0803      |
 
 - **Nome do projeto:** Torres Latinas
 - **Nome do grupo:** Torres Latinas
@@ -51,7 +51,7 @@
     O avaliador vai olhar exatamente esta versão. Para criar uma tag:
       git tag v1.0 && git push origin v1.0
   -->
-- **Ponto de partida:** [template do Sudoku com ajustes | variante do Sudoku | outro jogo conhecido | remix original | jogo inventado]
+- **Ponto de partida:** Remix original
   <!--
     Escolha UMA faixa. Ela define o ajuste de escopo da nota do grupo
     (AVALIACAO.md, seção 1.5). O professor confirma a faixa na apresentação.
@@ -75,6 +75,7 @@ O Torres Latinas é um jogo de lógica executado no navegador, voltado para pess
 [Resumo do projeto.]
 
 ![Captura de tela do sistema](docs/torres-latinas.png)
+
 <!-- Uma ou duas capturas de tela da interface. Crie a pasta docs/ se precisar. -->
 
 ## 3. Como executar
@@ -117,11 +118,12 @@ make test
 [Elm] --HTTP/JSON--> [Python] --janus--> [Prolog]
 ```
 
-| Parte  | Responsabilidade | Arquivos principais |
-|--------|------------------|---------------------|
-| Prolog | [...]            | [`backend/prolog/...`] |
-| Elm    | [...]            | [`frontend/src/...`]   |
-| Python | [só integração]  | [`backend/app/...`]    |
+| Parte      | Responsabilidade                                                     | Arquivos principais                                                                                       |
+| ---------- | -------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------- |
+| Prolog     | Define as regras, resolve e gera puzzles e produz dicas              | `backend/prolog/torres.pl`, `backend/prolog/explicador.pl`                                                |
+| Python     | Valida o formato dos pedidos HTTP e encaminha as chamadas ao Prolog  | `backend/app/main.py`, `backend/app/prolog.py`                                                            |
+| Elm        | Mantém o estado da partida, validações visuais e interface           | `frontend/src/Main.elm`, `frontend/src/Towers.elm`, `frontend/src/Api.elm`, `frontend/src/Statistics.elm` |
+| JavaScript | Inicializa o Elm e lê e grava tema e recordes no armazenamento local | `frontend/src/main.js`                                                                                    |
 
 ## 5. Parte em Prolog
 
@@ -133,10 +135,18 @@ make test
   do SWI-Prolog.
 -->
 
-| Predicado | Local | O que faz |
-|-----------|-------|-----------|
-| [`resolver(+Entrada, -Saida)`] | [`arquivo.pl:42`] | [...] |
-| [...] | [...] | [...] |
+| Predicado                                                                                                           | Local                             | O que faz                                                                                 |
+| ------------------------------------------------------------------------------------------------------------------- | --------------------------------- | ----------------------------------------------------------------------------------------- |
+| `towers/2` - `towers(?Puzzle, ?Rows)`                                                                               | `backend/prolog/torres.pl:79`     | Relaciona o puzzle à grade e impõe as restrições do jogo.                                 |
+| `visible/2` - `visible(?Line, ?Count)`                                                                              | `backend/prolog/torres.pl:143`    | Relaciona uma sequência de alturas à quantidade de prédios visíveis.                      |
+| `line_dots/2` - `line_dots(?Line, ?Dots)`                                                                           | `backend/prolog/torres.pl:162`    | Relaciona alturas vizinhas aos pontos, considerando também a ausência deles.              |
+| `solve/2` - `solve(+Puzzle, -Solution)`                                                                             | `backend/prolog/torres.pl:176`    | Encontra uma solução para o puzzle.                                                       |
+| `solve/3` - `solve(+Puzzle, +Board, -Solution)`                                                                     | `backend/prolog/torres.pl:188`    | Resolve o puzzle respeitando as alturas já colocadas no tabuleiro.                        |
+| `count_solutions/3` - `count_solutions(+Puzzle, +Limit, -Count)`                                                    | `backend/prolog/torres.pl:196`    | Conta soluções até o limite informado; é usado para verificar se a solução é única.       |
+| `generate/2` - `generate(+Difficulty, -Puzzle)`                                                                     | `backend/prolog/torres.pl:239`    | Gera um puzzle para a dificuldade informada.                                              |
+| `hint/3` - `hint(+Puzzle, +Board, -Result)`                                                                         | `backend/prolog/torres.pl:348`    | Escolhe uma altura para sugerir e retorna uma explicação.                                 |
+| `explain_cell/6` - `explain_cell(+Puzzle, +Board, +Row, +Col, +Value, -Explanation)`                                | `backend/prolog/explicador.pl:11` | Produz uma explicação para a altura sugerida.                                             |
+| `explain_cell_deductive/7` - `explain_cell_deductive(+Puzzle, +Board, +Row, +Col, +Value, -Priority, -Explanation)` | `backend/prolog/explicador.pl:26` | Procura uma regra dedutiva que justifique a altura e retorna sua prioridade e explicação. |
 
 ### 5.2 Conceitos do paradigma lógico utilizados
 
@@ -145,15 +155,14 @@ make test
   tudo; é preciso explicar bem o que foi usado.
 -->
 
-- [ ] Fatos e regras como base de conhecimento: [onde]
-- [ ] Unificação e casamento de padrões: [onde]
-- [ ] Recursão (inclusive sobre listas): [onde]
-- [ ] Backtracking e múltiplas soluções: [onde]
-- [ ] `findall/3`, `bagof/3`, `setof/3` ou similares: [onde]
-- [ ] Corte (`!`) ou negação (`\+`), e por que foram necessários: [onde]
-- [ ] Programação por restrições (CLP(FD) ou outra): [onde]
-- [ ] Predicados de ordem superior (`maplist`, `foldl`, `include`...): [onde]
-- [ ] Outro: [...]
+- [x] Fatos e regras como base de conhecimento: `difficulty/3` e `towers/2` (`backend/prolog/torres.pl:79, 234–236`)
+- [x] Unificação e casamento de padrões: `visible_flags/3` e `line_dots/2` (`backend/prolog/torres.pl:150–166`)
+- [x] Recursão (inclusive sobre listas): `visible_flags/3`, `line_dots/2` e `dig_clues/4` (`backend/prolog/torres.pl:150–166, 297–304`)
+- [x] Backtracking e múltiplas soluções: `labeling/2` e `count_solutions/3` (`backend/prolog/torres.pl:176–202`)
+- [x] `findall/3`, `bagof/3`, `setof/3` ou similares: `findall/3` em `torres.pl:197, 265, 289, 354, 366, 369, 387` e `explicador.pl:107, 124, 140, 162, 541, 608`
+- [x] Corte (`!`) ou negação (`\+`), e por que foram necessários: cortes em `torres.pl:180, 211, 246, 257` controlam a busca; negações em `explicador.pl:105, 113, 128, 231, 543–544, 611–612` eliminam candidatos
+- [x] Programação por restrições (CLP(FD) ou outra): `latin_square/2`, `visible/2` e `line_dots/2` (`backend/prolog/torres.pl:104–111, 143–166`)
+- [x] Predicados de ordem superior (`maplist`, `foldl`, `include`...): `maplist/…` e `foldl/…` (`backend/prolog/torres.pl:86–111, 315`)
 
 ### 5.3 Trecho em destaque
 
@@ -181,11 +190,118 @@ make test
 -->
 
 ```elm
-[type alias Model = ...]
-[type Msg = ...]
+type alias Model =
+    { game : Maybe Game
+    , difficulty : Difficulty
+    , mode : InputMode
+    , status : Status
+    , darkTheme : Bool
+    , bestTimes : Statistics.BestTimes
+    , showVictoryModal : Bool
+    }
+
+
+type alias Game =
+    { puzzle : Puzzle
+    , board : Board
+    , history : History
+    , selected : Maybe Position
+    , difficulty : Difficulty
+    , startedAt : Maybe Time.Posix
+    , elapsedSeconds : Int
+    , hintsUsed : Int
+    , solverUsed : Bool
+    , finished : Bool
+    , newRecord : Bool
+    }
+
+
+type alias History =
+    { past : List Board
+    , future : List Board
+    }
+
+
+type Status
+    = Idle
+    | Thinking
+    | HintGiven String
+    | Failed String
+
+
+type InputMode
+    = Heights
+    | Candidates
+
+
+type Msg
+    = NewGame Difficulty
+    | GotPuzzle (Result String Puzzle)
+    | CellClicked Position
+    | HeightPressed Int
+    | ErasePressed
+    | ModeToggled
+    | ThemeToggled Bool
+    | MoveSelection Int Int
+    | UndoPressed
+    | RedoPressed
+    | HintRequested
+    | GotHint (Result String Api.Hint)
+    | SolveRequested
+    | GotSolution (Result String (List (List Int)))
+    | ResetRequested
+    | ErrorDismissed
+    | ClockStarted Time.Posix
+    | Tick Time.Posix
+    | GameCompleted Time.Posix
+    | VictoryModalDismissed
+
+type Clue
+    = NoClue
+    | Sees Int
+
+
+type Side
+    = Top
+    | Bottom
+    | Left
+    | Right
+
+
+type Cell
+    = Placed Int
+    | Revealed Int
+    | Marks (Set Int)
+    | Empty
+
+
+type Board
+    = Board Int (Array Cell)
+
+
+type ClueStatus
+    = Unchecked
+    | Satisfied
+    | Violated
+
+
+type Difficulty
+    = Easy
+    | Medium
+    | Hard
 ```
 
-[Explicação das escolhas.]
+O `Model` reúne o estado necessário para desenhar e atualizar a interface e a partida. Alguns campos são registros naturalmente binários, como `darkTheme` e `finished`, então `Bool` é adequado para eles. Para situações com mais de dois estados, usamos custom types.
+
+Por exemplo, `Status` distingue `Idle`, `Thinking`, `HintGiven` e `Failed`. Um único `Bool` não representaria esses estados; vários booleanos poderiam permitir combinações inválidas, como o jogo estar carregando e exibindo um erro ao mesmo tempo. `InputMode` também usa `Heights` e `Candidates` para nomear o modo atual, em vez de deixar o significado de um `Bool` implícito.
+
+`Cell` distingue uma altura colocada pelo jogador (`Placed`), uma revelada pelo Prolog (`Revealed`), candidatos anotados (`Marks`) e uma casa vazia (`Empty`). Isso permite tratar cada tipo de conteúdo de forma explícita. `Clue` diferencia `NoClue` de `Sees Int`, evitando usar o número `0` como um valor especial dentro do domínio. `Difficulty`, `Side` e `ClueStatus` também representam conjuntos específicos de opções, e seus construtores tornam o código mais claro e permitem ao compilador verificar se todos os casos foram tratados.
+
+Usamos `Maybe` quando um valor pode estar ausente: `Maybe Game` representa que o puzzle ainda não chegou; `Maybe Position`, que não há casa selecionada; e `Maybe Time.Posix`, que o cronômetro ainda não começou. Isso evita inventar valores especiais para representar ausência. Nas respostas da API, `Result` representa os dois resultados possíveis de uma operação: sucesso ou erro. Por exemplo, `GotPuzzle (Result String Puzzle)` pode receber um puzzle válido ou uma mensagem de erro.
+
+`Puzzle` é um custom type opaco: outros módulos não podem criá-lo diretamente. Os dados recebidos da API passam por `fromRaw`, que confere as dimensões antes de construir o puzzle. `Board` guarda o tamanho junto com as células, e `Cell` descreve o conteúdo de cada casa. `History` mantém as listas de tabuleiros anteriores e desfeitos para permitir desfazer e refazer.
+
+Por fim, `Msg` enumera os eventos que o `update` pode receber, como jogadas, respostas da API, teclas e atualizações do cronômetro. Como cada evento é um construtor do tipo, o `case` do `update` pode tratar cada situação explicitamente.
 
 ### 6.2 Conceitos do paradigma funcional utilizados
 
@@ -215,9 +331,11 @@ make test
   explique como Elm e Prolog se comunicam.
 -->
 
-| Rota / chamada | Entrada | Saída | Predicado Prolog |
-|----------------|---------|-------|------------------|
-| [`POST /api/...`] | [...] | [...] | [`...`] |
+| Rota / chamada       | Entrada                                  | Saída                                           | Predicado Prolog |
+| -------------------- | ---------------------------------------- | ----------------------------------------------- | ---------------- |
+| `POST /api/generate` | Dificuldade (`easy`, `medium` ou `hard`) | Pistas e pontos do puzzle                       | `generate/2`     |
+| `POST /api/solve`    | Puzzle e tabuleiro atual                 | Tabuleiro resolvido ou erro 422                 | `	solve/3`        |
+| `POST /api/hint`     | Puzzle e tabuleiro atual                 | Linha, coluna, altura e explicação, ou erro 422 | `hint/3`         |
 
 ## 8. Testes e validação
 
@@ -226,8 +344,17 @@ make test
   pytest, elm-test), roteiros de teste manual, casos de borda verificados.
 -->
 
-- [O que foi testado e como.]
-- [Casos de borda considerados.]
+O projeto reúne testes PlUnit para as regras e o gerador (`backend/prolog/test_torres.pl`), testes do explicador (`backend/prolog/test_explicador.pl`), testes pytest para as rotas da API (`backend/tests/test_api.py`) e testes Elm para estatísticas (`frontend/tests/StatisticsTest.elm`). O alvo `make test` executa essas quatro suítes. Também usamos `npm run build` para compilar o frontend e make validar para verificar a estrutura dos arquivos de entrega.
+
+Os testes cobrem regras do tabuleiro, geração e solução de puzzles, deduções explicadas, formato das respostas HTTP e cálculo de tempos e recordes. Foram verificados manualmente:
+
+- geração de puzzles nos três níveis
+- seleção e preenchimento de casas;
+- modo de candidatos
+- uso de dicas e do Resolver;
+- desfazer e refazer jogadas
+- cronômetro durante a partida;
+- e conclusão do tabuleiro, incluindo a exibição do modal de vitória e o bloqueio das ações após a conclusão.
 
 ## 9. Limitações e problemas conhecidos
 
@@ -236,8 +363,9 @@ make test
   problema escondido que o avaliador descobre sozinho.
 -->
 
-- [Limitação ou bug conhecido, e em que situação acontece.]
-- [O que o grupo faria com mais tempo.]
+- Os níveis são gerados automaticamente. “Fácil”, “médio” e “difícil” correspondem principalmente ao tamanho da grade e à proporção de pistas de borda mantidas; o gerador não mede a dificuldade lógica de cada puzzle (torres.pl:230–250). A unicidade da solução é verificada, mas isso não garante que o puzzle possa ser resolvido somente com as deduções ensinadas pelo explicador.
+- Quando não encontra uma dedução direta coberta por suas regras, o explicador usa a solução do Prolog e apresenta uma explicação genérica (torres.pl:348–380). Portanto, nem toda dica representa uma cadeia de raciocínio humano passo a passo.
+- O tema e os recordes são guardados no navegador. O progresso da partida não é persistido; fechar ou recarregar a página perde o tabuleiro atual.
 
 ## 10. Contribuição de cada integrante
 
@@ -246,13 +374,11 @@ make test
   repositório. Todos os integrantes precisam concordar com esta tabela.
 -->
 
-| Integrante | Principais contribuições |
-|------------|--------------------------|
-| [Nome]     | [...] |
-| [Nome]     | [...] |
-| [Nome]     | [...] |
-| [Nome]     | [...] |
-| [Nome]     | [...] |
+| Integrante      | Principais contribuições                                                                                                                                                |
+| --------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Maciel Custódio | Explicador de dicas em Prolog, desfazer/refazer, cronômetro e recordes por dificuldade, modal de vitória, testes do explicador e das estatísticas, melhorias no design. |
+| [Nome]          | [...]                                                                                                                                                                   |
+| [Nome]          | [...]                                                                                                                                                                   |
 
 <!--
   Além desta tabela, que é do grupo, cada integrante entrega uma avaliação
@@ -267,11 +393,14 @@ make test
   deixar de declarar pode anular o trabalho.
 -->
 
-**Código reaproveitado.** [Ex.: "Partimos do template do Sudoku. Mantivemos
-a integração Python e a estrutura do frontend; o arquivo `x.pl` e os
-módulos `Y.elm` e `Z.elm` foram escritos pelo grupo."]
+**Código reaproveitado.** Partimos do template de Sudoku da disciplina. Reaproveitamos a integração Python e a estrutura inicial do frontend, que foram adaptadas ao jogo Torres Latinas. As regras, o gerador, o resolvedor e as funcionalidades específicas do jogo foram desenvolvidos pelo grupo.
 
-**Referências.** [Livros, documentação, tutoriais, repositórios consultados.]
+**Referências.** Documentação oficial do SWI-Prolog, incluindo CLP(FD) e Janus; guia oficial do Elm; documentação do FastAPI.
+
+- https://www.swi-prolog.org/pldoc/man?section=clpfd
+- https://www.swi-prolog.org/pldoc/man?section=janus
+- https://guide.elm-lang.org/
+- https://fastapi.tiangolo.com/
 
 **Uso de ferramentas de IA.**
 
@@ -283,9 +412,9 @@ módulos `Y.elm` e `Z.elm` foram escritos pelo grupo."]
     seção 1.5. Não declarar anula o trabalho; declarar não tira pontos.
   -->
 
-| Ferramenta | Para que foi usada | Como o grupo verificou o resultado |
-|------------|--------------------|------------------------------------|
-| [Nome ou "nenhuma"] | [...] | [...] |
+| Ferramenta    | Para que foi usada                                                                                                                                                  | Como o grupo verificou o resultado                                                             |
+| ------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------- |
+| ChatGPT/Codex | Apoio na criação de testes unitários, discussão de regras e deduções para as dicas, sugestões e complementação de código, explicação de erros e revisão de trechos. | O grupo revisou e adaptou as sugestões, executou os testes e conferiu o comportamento do jogo. |
 
 ## 12. Apresentação oral
 
@@ -302,13 +431,13 @@ módulos `Y.elm` e `Z.elm` foram escritos pelo grupo."]
 - **Slides:** [mesmo caminho indicado na seção 1, ou "não há"]
 - **Roteiro:**
 
-| Parte | Duração | Quem apresenta |
-|-------|:-------:|----------------|
-| [Contexto e objetivo] | [2 min] | [Nome] |
-| [Demonstração] | [5 min] | [Nome] |
-| [Código Prolog] | [3 min] | [Nome] |
-| [Código Elm] | [3 min] | [Nome] |
-| [Limitações e aprendizados] | [2 min] | [Nome] |
+| Parte                       | Duração | Quem apresenta |
+| --------------------------- | :-----: | -------------- |
+| [Contexto e objetivo]       | [2 min] | [Nome]         |
+| [Demonstração]              | [5 min] | [Nome]         |
+| [Código Prolog]             | [3 min] | [Nome]         |
+| [Código Elm]                | [3 min] | [Nome]         |
+| [Limitações e aprendizados] | [2 min] | [Nome]         |
 
 ## 13. Reflexão sobre os paradigmas
 
