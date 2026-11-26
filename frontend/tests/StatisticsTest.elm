@@ -23,6 +23,25 @@ suite =
                 \_ ->
                     Statistics.formatTime 125
                         |> Expect.equal "02:05"
+            , test "formata zero, segundos com zero à esquerda e um minuto" <|
+                \_ ->
+                    [ Statistics.formatTime 0
+                    , Statistics.formatTime 9
+                    , Statistics.formatTime 60
+                    ]
+                        |> Expect.equal [ "00:00", "00:09", "01:00" ]
+            , test "calcula segundos completos e descarta a fração" <|
+                \_ ->
+                    Statistics.elapsedSeconds
+                        (Time.millisToPosix 1000)
+                        (Time.millisToPosix 6999)
+                        |> Expect.equal 5
+            , test "não retorna tempo negativo" <|
+                \_ ->
+                    Statistics.elapsedSeconds
+                        (Time.millisToPosix 5000)
+                        (Time.millisToPosix 3000)
+                        |> Expect.equal 0
             ]
         , describe "recordes"
             [ test "registra a primeira partida sem ajuda" <|
@@ -54,25 +73,6 @@ suite =
                     Statistics.recordIfEligible Medium 80 0 False emptyRecords
                         |> .medium
                         |> Expect.equal (Just 80)
-            , test "formata zero, segundos com zero à esquerda e um minuto" <|
-                \_ ->
-                    [ Statistics.formatTime 0
-                    , Statistics.formatTime 9
-                    , Statistics.formatTime 60
-                    ]
-                        |> Expect.equal [ "00:00", "00:09", "01:00" ]
-            , test "calcula segundos completos e descarta a fração" <|
-                \_ ->
-                    Statistics.elapsedSeconds
-                        (Time.millisToPosix 1000)
-                        (Time.millisToPosix 6999)
-                        |> Expect.equal 5
-            , test "não retorna tempo negativo" <|
-                \_ ->
-                    Statistics.elapsedSeconds
-                        (Time.millisToPosix 5000)
-                        (Time.millisToPosix 3000)
-                        |> Expect.equal 0
             , test "substitui o recorde quando o novo tempo é menor" <|
                 \_ ->
                     Statistics.recordIfEligible Easy
@@ -106,5 +106,21 @@ suite =
                             , medium = Just 80
                             , hard = Just 65
                             }
+            ]
+        , describe "placar de partidas e vitórias"
+            [ test "inicia zerado" <|
+                \_ ->
+                    Statistics.initMatchStats
+                        |> Expect.equal { gamesPlayed = 0, wins = 0 }
+            , test "incrementa partidas jogadas e vitórias quando vence" <|
+                \_ ->
+                    Statistics.initMatchStats
+                        |> Statistics.recordMatch True
+                        |> Expect.equal { gamesPlayed = 1, wins = 1 }
+            , test "incrementa apenas partidas jogadas quando não vence" <|
+                \_ ->
+                    Statistics.initMatchStats
+                        |> Statistics.recordMatch False
+                        |> Expect.equal { gamesPlayed = 1, wins = 0 }
             ]
         ]

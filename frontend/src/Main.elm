@@ -29,6 +29,9 @@ import Towers exposing (Board, Cell(..), Clue(..), ClueStatus(..), Position, Puz
 port saveBestTimes : Encode.Value -> Cmd msg
 
 
+port saveMatchStats : Encode.Value -> Cmd msg
+
+
 
 -- MAIN
 
@@ -52,6 +55,7 @@ main =
 type alias Flags =
     { darkTheme : Bool
     , bestTimes : Statistics.BestTimes
+    , matchStats : Statistics.MatchStats
     }
 
 
@@ -63,6 +67,7 @@ type alias Model =
     , darkTheme : Bool
     , bestTimes : Statistics.BestTimes
     , showVictoryModal : Bool
+    , matchStats : Statistics.MatchStats
     }
 
 
@@ -83,6 +88,7 @@ type alias Game =
     , solverUsed : Bool
     , finished : Bool
     , newRecord : Bool
+    , countedAsPlayed : Bool
     }
 
 
@@ -124,6 +130,7 @@ init flags =
       , darkTheme = flags.darkTheme
       , bestTimes = flags.bestTimes
       , showVictoryModal = False
+      , matchStats = flags.matchStats
       }
     , Api.generate Medium GotPuzzle
     )
@@ -160,8 +167,40 @@ update : Msg -> Model -> ( Model, Cmd Msg )
 update msg model =
     case msg of
         NewGame difficulty ->
-            ( { model | difficulty = difficulty, status = Thinking, showVictoryModal = False }
-            , Api.generate difficulty GotPuzzle
+            let
+                abandonedStats =
+                    case model.game of
+                        Just game ->
+                            if not game.finished && not game.countedAsPlayed then
+                                Statistics.recordMatch game.difficulty False model.matchStats
+                            
+                            else
+                                model.matchStats
+                            
+                        Nothing ->
+                            model.matchStats
+                
+                statsChanged =
+                    abandonedStats /= model.matchStats
+                
+                nextCmd =
+                    if statsChanged then
+                        Cmd.batch
+                            [ Api.generate difficulty GotPuzzle
+                            , saveMatchStats (encodeMatchStats abandonedStats)
+                            ]
+                    
+                    else
+                        Api.generate difficulty GotPuzzle
+
+            in
+            ( { model
+                | difficulty = difficulty
+                , status = Thinking
+                , showVictoryModal = False
+                , matchStats = abandonedStats
+            }
+            , nextCmd
             )
 
         GotPuzzle (Ok puzzle) ->
@@ -179,6 +218,7 @@ update msg model =
                         , solverUsed = False
                         , finished = False
                         , newRecord = False
+                        , countedAsPlayed = False
                         }
                 , status = Idle
                 , showVictoryModal = False
@@ -414,18 +454,43 @@ finishGame now model =
                             newRecord =
                                 updatedRecords /= model.bestTimes
 
+                            isWin =
+                                not game.solverUsed
+                            
+                            matchStats0 =
+                                model.matchStats
+
+                            updatedMatchStats =
+                                if game.countedAsPlayed then
+                                    if isWin then
+                                        Statistics.addWinForDifficulty game.difficulty matchStats0
+                                    
+                                    else
+                                        matchStats0
+
+                                else
+                                    Statistics.recordMatch game.difficulty isWin model.matchStats
+
                             finishedGame =
-                                { game | finished = True, newRecord = newRecord }
+                                { game
+                                    | finished = True
+                                    , newRecord = newRecord
+                                    , countedAsPlayed = True
+                                }
 
                             finishedModel =
                                 { model
                                     | game = Just finishedGame
+                                    , matchStats = updatedMatchStats
                                     , status = Idle
                                     , showVictoryModal = True
                                 }
+
+                            statsCmd =
+                                saveMatchStats (encodeMatchStats updatedMatchStats)
                         in
                         if updatedRecords == model.bestTimes then
-                            ( finishedModel, Cmd.none )
+                            ( finishedModel, statsCmd )
 
                         else
                             let
@@ -433,7 +498,10 @@ finishGame now model =
                                     { finishedModel | bestTimes = updatedRecords }
                             in
                             ( modelWithRecord
-                            , saveBestTimes (encodeBestTimes updatedRecords)
+                            , Cmd.batch
+                                [ saveBestTimes (encodeBestTimes updatedRecords)
+                                , statsCmd
+                                ]
                             )
 
                 Nothing ->
@@ -441,6 +509,18 @@ finishGame now model =
 
         Nothing ->
             ( model, Cmd.none )
+
+
+encodeMatchStats : Statistics.MatchStats -> Encode.Value
+encodeMatchStats stats =
+    Encode.object
+        [ ( "easyGamesPlayed", Encode.int stats.easyGamesPlayed )
+        , ( "easyWins", Encode.int stats.easyWins )
+        , ( "mediumGamesPlayed", Encode.int stats.mediumGamesPlayed )
+        , ( "mediumWins", Encode.int stats.mediumWins )
+        , ( "hardGamesPlayed", Encode.int stats.hardGamesPlayed )
+        , ( "hardWins", Encode.int stats.hardWins )
+        ]
 
 
 encodeBestTimes : Statistics.BestTimes -> Encode.Value
@@ -1231,6 +1311,9 @@ viewStatistics model =
                     Statistics.bestTimeFor game.difficulty model.bestTimes
                         |> Maybe.map Statistics.formatTime
                         |> Maybe.withDefault "—"
+                
+                currentMatchStats =
+                    Statistics.matchStatsFor game.difficulty model.matchStats
             in
             div [ class "game-stats" ]
                 [ p [ class "game-stat" ]
@@ -1244,6 +1327,14 @@ viewStatistics model =
                 , p [ class "game-stat" ]
                     [ span [] [ text "Recorde sem ajuda" ]
                     , span [] [ text best ]
+                    ]
+                , p [ class "game-stat" ]
+                    [ span [] [ text "Partidas jogadas" ]
+                    , span [] [ text (String.fromInt currentMatchStats.gamesPlayed) ]
+                    ]
+                , p [ class "game-stat" ]
+                    [ span [] [ text "Vitórias" ]
+                    , span [] [ text (String.fromInt currentMatchStats.wins) ]
                     ]
                 ]
 
