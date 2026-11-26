@@ -37,18 +37,36 @@ function loadBestTimes() {
 }
 
 function loadMatchStats() {
+  const emptyStats = {
+    easyGamesPlayed: 0,
+    easyWins: 0,
+    mediumGamesPlayed: 0,
+    mediumWins: 0,
+    hardGamesPlayed: 0,
+    hardWins: 0,
+  };
+
   try {
     const raw = localStorage.getItem(MATCH_STATS_KEY);
     if (!raw) {
-      return { gamesPlayed: 0, wins: 0 };
+      return emptyStats;
     }
-    const parsed = JSON.parse(raw);
+    const parsed = JSON.parse(raw) || {};
+    const validCount = (value) =>
+      typeof value === "number" && Number.isFinite(value) && value >= 0
+        ? Math.floor(value)
+        : 0;
+
     return {
-      gamesPlayed: typeof parsed.gamesPlayed === "number" ? parsed.gamesPlayed : 0,
-      wins: typeof parsed.wins === "number" ? parsed.wins : 0,
+      easyGamesPlayed: validCount(parsed.easyGamesPlayed),
+      easyWins: validCount(parsed.easyWins),
+      mediumGamesPlayed: validCount(parsed.mediumGamesPlayed),
+      mediumWins: validCount(parsed.mediumWins),
+      hardGamesPlayed: validCount(parsed.hardGamesPlayed),
+      hardWins: validCount(parsed.hardWins),
     };
   } catch {
-    return { gamesPlayed: 0, wins: 0 };
+    return emptyStats;
   }
 }
 

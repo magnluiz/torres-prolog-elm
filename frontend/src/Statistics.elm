@@ -7,6 +7,8 @@ module Statistics exposing
     , MatchStats
     , initMatchStats
     , recordMatch
+    , addWinForDifficulty
+    , matchStatsFor
     )
 
 import Api exposing (Difficulty(..))
@@ -24,28 +26,79 @@ type alias BestTimes =
 
 
 type alias MatchStats =
-    { gamesPlayed : Int
-    , wins : Int
+    { easyGamesPlayed : Int
+    , easyWins : Int
+    , mediumGamesPlayed : Int
+    , mediumWins : Int
+    , hardGamesPlayed : Int
+    , hardWins : Int
     }
 
 initMatchStats : MatchStats
 initMatchStats =
-    { gamesPlayed = 0
-    , wins = 0
+    { easyGamesPlayed = 0
+    , easyWins = 0
+    , mediumGamesPlayed = 0
+    , mediumWins = 0
+    , hardGamesPlayed = 0
+    , hardWins = 0
     }
 
 
-recordMatch : Bool -> MatchStats -> MatchStats
-recordMatch won stats =
-    { stats
-        | gamesPlayed = stats.gamesPlayed + 1
-        , wins =
+matchStatsFor : Difficulty -> MatchStats -> { gamesPlayed : Int, wins : Int }
+matchStatsFor difficulty stats =
+    case difficulty of
+        Easy ->
+            { gamesPlayed = stats.easyGamesPlayed, wins = stats.easyWins }
+
+        Medium ->
+            { gamesPlayed = stats.mediumGamesPlayed, wins = stats.mediumWins }
+
+        Hard ->
+            { gamesPlayed = stats.hardGamesPlayed, wins = stats.hardWins }
+
+
+recordMatch : Difficulty -> Bool -> MatchStats -> MatchStats
+recordMatch difficulty won stats =
+    let
+        winDelta =
             if won then
-                stats.wins + 1
+                1
 
             else
-                stats.wins
-    }
+                0
+    in
+    case difficulty of
+        Easy ->
+            { stats
+                | easyGamesPlayed = stats.easyGamesPlayed + 1
+                , easyWins = stats.easyWins + winDelta
+            }
+
+        Medium ->
+            { stats
+                | mediumGamesPlayed = stats.mediumGamesPlayed + 1
+                , mediumWins = stats.mediumWins + winDelta
+            }
+
+        Hard ->
+            { stats
+                | hardGamesPlayed = stats.hardGamesPlayed + 1
+                , hardWins = stats.hardWins + winDelta
+            }
+
+
+addWinForDifficulty : Difficulty -> MatchStats -> MatchStats
+addWinForDifficulty difficulty stats =
+    case difficulty of
+        Easy ->
+            { stats | easyWins = stats.easyWins + 1 }
+
+        Medium ->
+            { stats | mediumWins = stats.mediumWins + 1 }
+
+        Hard ->
+            { stats | hardWins = stats.hardWins + 1 }
 
 
 bestTimeFor : Difficulty -> BestTimes -> Maybe Int
